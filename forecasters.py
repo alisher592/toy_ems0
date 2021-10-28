@@ -31,13 +31,13 @@ class LoadForecaster:
 
         self.current_datetime = datetime.now()
 
-    def hour_of_year(self):
+    def hour_of_year(self, date):
         """
         Функция получения порядкового номера текущего часа в разрезе года
         :return:
         """
-        beginning_of_year = datetime(self.current_datetime.year, 1, 1, tzinfo=self.current_datetime.tzinfo)
-        return (self.current_datetime - beginning_of_year).total_seconds() // 3600
+        beginning_of_year = datetime(date.year, 1, 1, tzinfo=date.tzinfo)
+        return (date - beginning_of_year).total_seconds() // 3600
 
     def get_hourly_forecast(self):
         """
@@ -50,15 +50,26 @@ class LoadForecaster:
         # hour = np.array([self.hour_of_year(date) for date in pd.date_range(datetime.now(),
         #                                                                   freq='H', periods=24).round('H')]).T[0:5]
 
-        features = self.X_scaler.transform(np.array([self.hour_of_year(date) for date in pd.date_range(datetime.now(),
-                                                                           freq='H', periods=24).round('H')]))
-        load_forecast = self.Y_scaler.inverse_transform(self.model.predict(features).reshape(len(model.predict(ft)), -1))
+        dtrange = pd.date_range(datetime.now(), freq='H', periods=24).round('H')
+
+        features = self.X_scaler.transform(np.array([[self.hour_of_year(date), date.timetuple().tm_yday,
+                                                      date.month, date.day, date.hour] for date in dtrange]))
+        raw_fcst = self.model.predict(features)
+
+
+        load_forecast = pd.DataFrame(index=dtrange)
+        load_forecast['Load_Forecast'] = self.Y_scaler.inverse_transform(raw_fcst.reshape(len(raw_fcst), -1))
 
         # plt.plot(self.Y_scaler.inverse_transform(self.model.predict(features).reshape(len(model.predict(ft)), -1)))
 
         return load_forecast
 
-files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
-L = LoadForecaster(files)
+# files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
+# L = LoadForecaster(files)
+
+# plt.plot(L.get_hourly_forecast())
+# plt.show()
+
+
 
 
