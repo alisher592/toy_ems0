@@ -155,6 +155,7 @@ class PV_forecaster:
         SPA = pvlib.solarposition.spa_python(Weather.index, p.location.latitude, p.location.longitude)
         Weather['solar_azimuth'] = SPA['azimuth']
         Weather['zenith'] = SPA['apparent_zenith']
+        print(Weather.columns)
         # light_weather = Weather.loc[Weather['zenith'] < 90].dropna()
         features = self.X_scaler.transform(Weather[['air_temperature', 'relative_humidity',
                                                     'cloud_area_fraction', 'cloud_area_fraction_low',
@@ -163,11 +164,14 @@ class PV_forecaster:
         raw_fcst = self.Y_scaler.inverse_transform(self.model.predict(features)).T
         irrad_fcst = pd.DataFrame()
         irrad_fcst.index = Weather.index
+        irrad_fcst['pressure'] = Weather['air_pressure_at_sea_level']
+        irrad_fcst['dew_temp'] = Weather['dew_point_temperature']
         irrad_fcst['ghi'] = raw_fcst[0]
         irrad_fcst['dhi'] = raw_fcst[1]
         irrad_fcst['dfhi'] = raw_fcst[2]
         irrad_fcst['zenith'] = Weather['zenith']
         irrad_fcst['solar_azimuth'] = Weather['solar_azimuth']
+
         irrad_fcst.loc[
             irrad_fcst['zenith'] > 90, ['ghi', 'dhi', 'dfhi']] = 0  # заменяем СР на ноль по критерию светового дня
 
@@ -184,26 +188,44 @@ class PV_forecaster:
         DNI_erbs = pvlib.irradiance.erbs(irrad_fcst['ghi'], irrad_fcst['zenith'], irrad_fcst.index,
                               min_cos_zenith=0.065, max_zenith=87)
 
-        plt.plot(DNI_erbs['dni'])
-        plt.plot(irrad_fcst['dni'])
-        plt.show()
-        print(DNI_erbs)
+        dirint = pvlib.irradiance.dirint(irrad_fcst['ghi'], irrad_fcst['zenith'], irrad_fcst.index,
+                                         pressure=1000*irrad_fcst['pressure'], use_delta_kt_prime=True,
+                                         temp_dew=irrad_fcst['dew_temp'],
+                                min_cos_zenith=0.065, max_zenith=87)
+
+        irrad_fcst['dirint_dni'] = dirint
+
+        disc = pvlib.irradiance.disc(irrad_fcst['ghi'], irrad_fcst['zenith'], irrad_fcst.index,
+                                     pressure=1000*irrad_fcst['pressure'],
+                                     min_cos_zenith=0.065, max_zenith=87, max_airmass=12)
+
+        #plt.plot(DNI_erbs['dni'])
+        #plt.plot(disc['dni'])
+        #plt.plot(dirint)
+        #plt.plot(irrad_fcst['dni'])
+        #plt.plot(irrad_fcst['ghi'])
+        #plt.show()
+        #print(dirint)
+        #print(irrad_fcst['pressure'])
 
         poa_irrad_fcst = pvlib.irradiance.get_total_irradiance(
             surface_tilt=self.surface_tilt,
             surface_azimuth=self.surface_azimuth,
-            dni=irrad_fcst['dni'],
+            dni=irrad_fcst['dirint_dni'],
             ghi=irrad_fcst['ghi'],
             dhi=irrad_fcst['dfhi'],
             solar_zenith=irrad_fcst['zenith'],
-            solar_azimuth=irrad_fcst['solar_azimuth'],
+            solar_azimuth=irrad_fcst['solar_azimuth'], dni_extra=pvlib.irradiance.get_extra_radiation(irrad_fcst.index,
+                                                                                                      solar_constant=1366.1,
+                                                                                                      method='spencer',
+                                                                                                      epoch_year=2022),
             model='isotropic', surface_type='snow')
 
         poa_irrad_fcst['air_temperature'] = Weather['air_temperature']
         poa_irrad_fcst['wind_speed'] = Weather['wind_speed']
         poa_irrad_fcst['cloud'] = Weather['cloud_area_fraction_low']
 
-        return irrad_fcst, poa_irrad_fcst
+        return irrad_fcst.fillna(0), poa_irrad_fcst.fillna(0)
 
 
     def get_pv_forecast(self):
@@ -246,28 +268,28 @@ class PV_forecaster:
         weather['wind_speed'] = poa_irrad_fcst['wind_speed']
         weather.columns = ['poa_global', 'poa_direct', 'poa_diffuse', 'temp_air', 'wind_speed']
 
-        pd.options.mode.chained_assignment = None  # default='warn' #убрать ошибку A value is trying to copy a slice
+        # pd.options.mode.chained_assignment = None  # default='warn' #убрать ошибку A value is trying to copy a slice
 
         inverter = self.inverters_CEC.T.iloc[471]
         # Эмулируем параметры инвертора GW136K-HTH
-        Sandia_inv = pvlib.inverter.fit_sandia(np.array([136000, 136000, 150000]),
-                                               np.array([205000, 205000, 205000]),
-                                               np.array([180, 750, 1100]),
-                                               np.array(['Vmin', 'Vnom', 'Vmax']), 136000, 2)
-        inverter['Paco'] = Sandia_inv['Paco']
-        inverter['Pdco'] = Sandia_inv['Pdco']
-        inverter['Pso'] = Sandia_inv['Pso']
-        inverter['C0'] = Sandia_inv['C0']
-        inverter['C1'] = Sandia_inv['C1']
-        inverter['C2'] = Sandia_inv['C2']
-        inverter['C3'] = Sandia_inv['C3']
-        inverter['Pnt'] = Sandia_inv['Pnt']
-
-        inverter.Vac = 500
-        inverter.Vdcmax = 1100
-        inverter.Idcmax = 186.36
-        inverter.Mppt_low = 180
-        inverter.Mppt_high = 1000
+        # Sandia_inv = pvlib.inverter.fit_sandia(np.array([136000, 136000, 150000]),
+        #                                        np.array([205000, 205000, 205000]),
+        #                                        np.array([180, 750, 1100]),
+        #                                        np.array(['Vmin', 'Vnom', 'Vmax']), 136000, 2)
+        # inverter['Paco'] = Sandia_inv['Paco']
+        # inverter['Pdco'] = Sandia_inv['Pdco']
+        # inverter['Pso'] = Sandia_inv['Pso']
+        # inverter['C0'] = Sandia_inv['C0']
+        # inverter['C1'] = Sandia_inv['C1']
+        # inverter['C2'] = Sandia_inv['C2']
+        # inverter['C3'] = Sandia_inv['C3']
+        # inverter['Pnt'] = Sandia_inv['Pnt']
+        #
+        # inverter.Vac = 500
+        # inverter.Vdcmax = 1100
+        # inverter.Idcmax = 186.36
+        # inverter.Mppt_low = 180
+        # inverter.Mppt_high = 1000
 
         temperature_model_parameters = pvlib.temperature.TEMPERATURE_MODEL_PARAMETERS['sapm'][
             'open_rack_glass_glass']  # температурная модель Sandia
@@ -284,17 +306,25 @@ class PV_forecaster:
 
 
 
-        return mc
+        return mc.results.ac
 
 pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
             'models/pv_keras/pv_Y_scaler_par.sca']
 
 p = PV_forecaster(pv_files)
-
-print(p.get_hourly_irrad_forecast()[0])
-# #
-# (p.get_hourly_irrad_forecast()[1]).plot()
-# plt.show()
 #
-# p.get_pv_forecast().plot()
+# # print(p.get_hourly_irrad_forecast()[1])
+#
+# # (p.get_hourly_irrad_forecast()[1]).plot()
+# # plt.show()
+#
+p.get_pv_forecast().plot()
+plt.show()
+
+# linke_turbidity = pvlib.clearsky.lookup_linke_turbidity(p.get_hourly_irrad_forecast()[1].index,
+#                                                         p.location.latitude, p.location.longitude)
+#
+# ineichen = clearsky.ineichen(apparent_zenith, airmass, linke_turbidity, altitude, dni_extra)
+#
+# plt.plot(linke_turbidity)
 # plt.show()
