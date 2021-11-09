@@ -69,11 +69,7 @@ class Load_forecaster:
         return load_forecast
 
 
-# files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
-# L = LoadForecaster(files)
 
-# plt.plot(L.get_hourly_forecast())
-# plt.show()
 
 class PV_forecaster:
 
@@ -105,14 +101,14 @@ class PV_forecaster:
         """
         useragent (str) - UserAgent для авторизации в системе yr.no
         latitude (float) - широта местности, для которой запрашивается прогноз
-        longitude (float) - долгота местности, для которой запрашивает прогноз
+        longitude (float) - долгота местности, для которой запрашивается прогноз
         set_timezone (str) - часовой пояс в формате pytz
         horizon (float) - (min=2, max=91, default=24) - горизонт упреждения прогноза в часах
         """
 
         headers = {'User-Agent': useragent}
         url = 'https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=' + \
-              str(self.location.latitude) + '&lon=' + str(self.location.latitude)
+              str(self.location.latitude) + '&lon=' + str(self.location.longitude)
 
         # запрос хэдеров со статистикой последних обновлений прогнозов
         try:
@@ -152,10 +148,9 @@ class PV_forecaster:
 
     def get_hourly_irrad_forecast(self):
         Weather = self.yrnoparser()  # получаем прогноз погоды
-        SPA = pvlib.solarposition.spa_python(Weather.index, p.location.latitude, p.location.longitude)
+        SPA = pvlib.solarposition.spa_python(Weather.index, self.location.latitude, self.location.longitude)
         Weather['solar_azimuth'] = SPA['azimuth']
         Weather['zenith'] = SPA['apparent_zenith']
-        print(Weather.columns)
         # light_weather = Weather.loc[Weather['zenith'] < 90].dropna()
         features = self.X_scaler.transform(Weather[['air_temperature', 'relative_humidity',
                                                     'cloud_area_fraction', 'cloud_area_fraction_low',
@@ -194,6 +189,7 @@ class PV_forecaster:
                                 min_cos_zenith=0.065, max_zenith=87)
 
         irrad_fcst['dirint_dni'] = dirint
+        irrad_fcst['clearsky_dni'] = clearsky_dni
 
         disc = pvlib.irradiance.disc(irrad_fcst['ghi'], irrad_fcst['zenith'], irrad_fcst.index,
                                      pressure=1000*irrad_fcst['pressure'],
@@ -306,20 +302,20 @@ class PV_forecaster:
 
 
 
-        return mc.results.ac
+        return 0.04*mc.results.ac
 
-pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
-            'models/pv_keras/pv_Y_scaler_par.sca']
-
-p = PV_forecaster(pv_files)
+# pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
+#             'models/pv_keras/pv_Y_scaler_par.sca']
+#
+# p = PV_forecaster(pv_files)
 #
 # # print(p.get_hourly_irrad_forecast()[1])
 #
-# # (p.get_hourly_irrad_forecast()[1]).plot()
-# # plt.show()
+# (p.get_hourly_irrad_forecast()[0]).plot()
+# plt.show()
 #
-p.get_pv_forecast().plot()
-plt.show()
+# (p.get_pv_forecast()*7).plot()
+# plt.show()
 
 # linke_turbidity = pvlib.clearsky.lookup_linke_turbidity(p.get_hourly_irrad_forecast()[1].index,
 #                                                         p.location.latitude, p.location.longitude)
@@ -327,4 +323,13 @@ plt.show()
 # ineichen = clearsky.ineichen(apparent_zenith, airmass, linke_turbidity, altitude, dni_extra)
 #
 # plt.plot(linke_turbidity)
+# plt.show()
+
+files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
+L = Load_forecaster(files)
+
+print(L.get_hourly_forecast().index)
+
+
+# plt.plot(L.get_hourly_forecast())
 # plt.show()

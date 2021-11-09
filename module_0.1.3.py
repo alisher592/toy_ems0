@@ -1,4 +1,4 @@
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sys
@@ -21,10 +21,13 @@ from shutil import copyfile
 import multiprocessing
 #import cloudpickle
 from pyomo.common.tempfiles import TempfileManager
-
+import forecasters
 if not os.path.exists(os.getcwd()+"\\tempo"):
     os.makedirs(os.getcwd()+"\\tempo")
 TempfileManager.tempdir = os.getcwd()+"\\tempo"
+
+
+
 
 def counter_time():
     start_time = time.time()
@@ -58,6 +61,15 @@ def counter_time():
 ##t1.start()
 ###t2.start()
 
+load_files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
+load_fcst = forecasters.Load_forecaster(load_files).get_hourly_forecast()
+
+pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
+            'models/pv_keras/pv_Y_scaler_par.sca']
+pv_fcst = forecasters.PV_forecaster(pv_files).get_pv_forecast()
+
+print(np.asarray(load_fcst)[23])
+
 
 
 class reading:
@@ -69,9 +81,9 @@ class reading:
 
     N = 4
     N = np.array([n for n in range(0, N)])
-    T = np.array([t for t in range(0, 5)])
+    T = np.array([t for t in range(0, 24)])
     T1 = 0
-    T2 = 5
+    T2 = 24
 
     p12 = np.arange(0, 321)
     p34 = np.arange(0, 521)
@@ -79,16 +91,16 @@ class reading:
     p_BESS = np.arange(0, 151)
 
 
-    DGU1_pmax = 320 #кВт
-    DGU1_pmin = 0.5*DGU1_pmax
+    DGU1_pmax = 400 #кВт
+    DGU1_pmin = 0.3*DGU1_pmax
 
-    DGU2_pmax = 320 #кВт
-    DGU2_pmin = 0.5*DGU2_pmax
+    DGU2_pmax = 400 #кВт
+    DGU2_pmin = 0.3*DGU2_pmax
 
-    DGU3_pmax = 520 #кВт
+    DGU3_pmax = 536 #кВт
     DGU3_pmin = 0.5*DGU3_pmax
 
-    DGU4_pmax = 520 #кВт
+    DGU4_pmax = 536 #кВт
     DGU4_pmin = 0.5*DGU4_pmax
 
     DGU1_fuel =  0.3031*p12
@@ -169,17 +181,26 @@ class reading:
                     #print(inn)
                     
                     #Псевдопрогноз нагрузки
-                    Load = [0,0,0,0,0]
-                    Load[0] = inn[0:7].sum()+inn[28:30].sum()+inn[42:46].sum()+inn[66]+inn[68]+inn[70]
-                    Load[1] = Load[0] + random.uniform(-65.0,65.0)*(-1)
-                    Load[2] = Load[0] + random.uniform(-65.0,65.0)*(-1)
-                    Load[3] = Load[0] + random.uniform(-65.0,65.0)*(-1)
-                    Load[4] = Load[0] + random.uniform(-65.0,65.0)*(-1)
+                    # Load = [0,0,0,0,0]
+                    # Load[0] = inn[0:7].sum()+inn[28:30].sum()+inn[42:46].sum()+inn[66]+inn[68]+inn[70]
+                    # Load[1] = Load[0] + random.uniform(-65.0,65.0)*(-1)
+                    # Load[2] = Load[0] + random.uniform(-65.0,65.0)*(-1)
+                    # Load[3] = Load[0] + random.uniform(-65.0,65.0)*(-1)
+                    # Load[4] = Load[0] + random.uniform(-65.0,65.0)*(-1)
 
+                    Load = load_fcst.values
                     
                     #псевдопрогноз выработки СЭС
-                    PV=[inn[0:7].sum(), inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1), inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1),
-                    inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1),inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1)]
+                    # PV=[inn[0:7].sum(), inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1), inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1),
+                    # inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1),inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1)]
+
+                    PV = (pv_fcst/1000).values.reshape(24,1)
+                    PV[PV<0] = 0
+
+                    #print('Hey!')
+
+                    #print(Load)
+
                     soc1_before = inn[34]/10
                     soc2_before = inn[35]/10
 
@@ -229,7 +250,7 @@ class reading:
                     ess1_availability_state = int(inn[40])
                     ess2_availability_state = int(inn[41])
 
-                        
+                    #print(PV)
 
                     return [Load, PV, soc1_before, soc2_before, u1_start, d1_up_before, d1_down_before, d1_availability_state, u2_start, d2_up_before, d2_down_before, d2_availability_state,
                     u3_start, d3_up_before, d3_down_before, d3_availability_state,
@@ -291,7 +312,10 @@ class opt_pyomo_formulating:
 
     #Ограничения
     def balance(self, model, i):
-        return self.m.x1[i] + self.m.x2[i] + self.m.x3[i] + self.m.x4[i] + self.m.bat1_dch[i] - self.m.bat1_ch[i] + self.m.bat2_dch[i] - self.m.bat2_ch[i] + self.m.PV1[i] + self.m.PV2[i] + self.m.PV3[i] + self.m.PV4[i] + self.m.PV5[i] + self.m.PV6[i] + self.m.PV7[i] == (np.asarray(reading.init_data_import()[0])[i]) 
+        return self.m.x1[i] + self.m.x2[i] + self.m.x3[i] + self.m.x4[i] + \
+               self.m.bat1_dch[i] - self.m.bat1_ch[i] + self.m.bat2_dch[i] - self.m.bat2_ch[i] + \
+               self.m.PV1[i] + self.m.PV2[i] + self.m.PV3[i] + self.m.PV4[i] + self.m.PV5[i] + self.m.PV6[i] + \
+               self.m.PV7[i] == reading.init_data_import()[0][:,0][i] #(np.asarray(
 
     def d1_start_up_cost(self, model, i):
         if i == reading.T1:
@@ -588,13 +612,13 @@ class opt_pyomo_formulating:
         self.m.lb4 = pyo.Constraint(self.m.T, rule=lambda m, t: reading.DGU4_pmin*m.u4[t] <= m.x4[t])
         self.m.ub4 = pyo.Constraint(self.m.T, rule=lambda m, t: reading.DGU4_pmax*m.u4[t] >= m.x4[t])
         
-        self.m.pv1 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV1[t] <= reading.PV[t]) #7 - число инверторов СЭС
-        self.m.pv2 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV2[t] <= reading.PV[t])
-        self.m.pv3 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV3[t] <= reading.PV[t])
-        self.m.pv4 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV4[t] <= reading.PV[t])
-        self.m.pv5 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV5[t] <= reading.PV[t])
-        self.m.pv6 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV6[t] <= reading.PV[t])
-        self.m.pv7 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV7[t] <= reading.PV[t])
+        self.m.pv1 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV1[t] <= reading.init_data_import()[1][:,0][t]) #7 - число инверторов СЭС
+        self.m.pv2 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV2[t] <= reading.init_data_import()[1][:,0][t])
+        self.m.pv3 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV3[t] <= reading.init_data_import()[1][:,0][t])
+        self.m.pv4 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV4[t] <= reading.init_data_import()[1][:,0][t])
+        self.m.pv5 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV5[t] <= reading.init_data_import()[1][:,0][t])
+        self.m.pv6 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV6[t] <= reading.init_data_import()[1][:,0][t])
+        self.m.pv7 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV7[t] <= reading.init_data_import()[1][:,0][t])
         
         self.m.pv1_curtailment = pyo.Constraint(self.m.T, rule=self.curtailment_control1)
         self.m.pv2_curtailment = pyo.Constraint(self.m.T, rule=self.curtailment_control2)
@@ -650,7 +674,6 @@ class optimization:
     entity = opt_pyomo_formulating()
 
     def optimizer(self):
-
         
         #print(os.getcwd())
         #opt =  pyo.SolverFactory('scipampl',executable=os.getcwd()+'\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
@@ -673,7 +696,7 @@ class optimization:
         if (results.solver.status == SolverStatus.ok) and (results.solver.termination_condition == TerminationCondition.optimal): #sum(np.fromiter(self.entity.m.x1.get_values().values(), dtype=float)) is not None:
             dfout = pd.DataFrame()
             #dfout.index=Load[T].index
-            dfout['Load'] = reading.init_data_import()[0]
+            dfout['Load'] = reading.init_data_import()[0][:,0]
             dfout['d1'] = self.entity.m.x1.get_values().values()
             dfout['d2'] = self.entity.m.x2.get_values().values()
             dfout['d3'] = self.entity.m.x3.get_values().values()
@@ -703,7 +726,7 @@ class optimization:
             dfout['bat2_ch'] = -dfout['bat2_ch']
             #dfout['dd1'] = m.u1.get_values().values()
 
-            dfout.index = Date
+            dfout.index = load_fcst.index
 
             out0 = reading.output_file_read()[0]
             out = reading.output_file_read()[1][0]            
@@ -778,86 +801,86 @@ class optimization:
             print('Следующая попытка через 5 секунд...')
             print()
 
-            # if 1>2:
-            #     #plt.rcParams['axes.grid'] = True
-            #     #fig, ax = plt.subplots(8, 1, figsize=(10, 14))
+            if 2>1:
+                plt.rcParams['axes.grid'] = True
+                fig, ax = plt.subplots(8, 1, figsize=(10, 14))
 
-            #     ax[0].bar(reading.T, [reading.init_data_import()[0][t] for t in reading.T])
-            #     ax[0].set_xlim(reading.T1, reading.T2)
-            #     ax[0].set_ylim(0, 1.1*700)
-            #     ax[0].plot(ax[1].get_xlim(), np.array([100, 100]), 'r--')
-            #     ax[0].plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
-            #     ax[0].set_title('Нагрузка')
+                ax[0].bar(reading.T, [reading.init_data_import()[0][:,0][t] for t in reading.T])
+                ax[0].set_xlim(reading.T1, reading.T2)
+                ax[0].set_ylim(0, 1.1*700)
+                ax[0].plot(ax[1].get_xlim(), np.array([100, 100]), 'r--')
+                ax[0].plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
+                ax[0].set_title('Нагрузка')
 
-            #     ax[1].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
-            #     ax[1].set_xlim(reading.T1, reading.T2)
-            #     ax[1].set_ylim(0, 1.1*reading.DGU1_pmax)
-            #     ax[1].plot(ax[0].get_xlim(), np.array([reading.DGU1_pmax, reading.DGU1_pmax]), 'r--')
-            #     ax[1].plot(ax[0].get_xlim(), np.array([reading.DGU1_pmin, reading.DGU1_pmin]), 'r--')
-            #     ax[1].set_title('ДГУ1')
+                ax[1].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
+                ax[1].set_xlim(reading.T1, reading.T2)
+                ax[1].set_ylim(0, 1.1*reading.DGU1_pmax)
+                ax[1].plot(ax[0].get_xlim(), np.array([reading.DGU1_pmax, reading.DGU1_pmax]), 'r--')
+                ax[1].plot(ax[0].get_xlim(), np.array([reading.DGU1_pmin, reading.DGU1_pmin]), 'r--')
+                ax[1].set_title('ДГУ1')
 
-            #     ax[2].bar(reading.T, [self.entity.m.x2[t]() for t in reading.T])
-            #     ax[2].set_xlim(reading.T1, reading.T2)
-            #     ax[2].set_ylim(0, 1.1*reading.DGU2_pmax)
-            #     ax[2].plot(ax[1].get_xlim(), np.array([reading.DGU2_pmax, reading.DGU2_pmax]), 'r--')
-            #     ax[2].plot(ax[1].get_xlim(), np.array([reading.DGU2_pmin, reading.DGU2_pmin]), 'r--')
-            #     ax[2].set_title('ДГУ2')
+                ax[2].bar(reading.T, [self.entity.m.x2[t]() for t in reading.T])
+                ax[2].set_xlim(reading.T1, reading.T2)
+                ax[2].set_ylim(0, 1.1*reading.DGU2_pmax)
+                ax[2].plot(ax[1].get_xlim(), np.array([reading.DGU2_pmax, reading.DGU2_pmax]), 'r--')
+                ax[2].plot(ax[1].get_xlim(), np.array([reading.DGU2_pmin, reading.DGU2_pmin]), 'r--')
+                ax[2].set_title('ДГУ2')
 
-            #     ax[3].bar(reading.T, [self.entity.m.x3[t]() for t in reading.T])
-            #     ax[3].set_xlim(reading.T1, reading.T2)
-            #     ax[3].set_ylim(0, 1.1*reading.DGU3_pmax)
-            #     ax[3].plot(ax[1].get_xlim(), np.array([reading.DGU3_pmax, reading.DGU3_pmax]), 'r--')
-            #     ax[3].plot(ax[1].get_xlim(), np.array([reading.DGU3_pmin, reading.DGU3_pmin]), 'r--')
-            #     ax[3].set_title('ДГУ3')
+                ax[3].bar(reading.T, [self.entity.m.x3[t]() for t in reading.T])
+                ax[3].set_xlim(reading.T1, reading.T2)
+                ax[3].set_ylim(0, 1.1*reading.DGU3_pmax)
+                ax[3].plot(ax[1].get_xlim(), np.array([reading.DGU3_pmax, reading.DGU3_pmax]), 'r--')
+                ax[3].plot(ax[1].get_xlim(), np.array([reading.DGU3_pmin, reading.DGU3_pmin]), 'r--')
+                ax[3].set_title('ДГУ3')
 
-            #     ax[4].bar(reading.T, [self.entity.m.x4[t]() for t in reading.T])
-            #     ax[4].set_xlim(reading.T1, reading.T2)
-            #     ax[4].set_ylim(0, 1.1*reading.DGU4_pmax)
-            #     ax[4].plot(ax[1].get_xlim(), np.array([reading.DGU4_pmax, reading.DGU4_pmax]), 'r--')
-            #     ax[4].plot(ax[1].get_xlim(), np.array([reading.DGU4_pmin, reading.DGU4_pmin]), 'r--')
-            #     ax[4].set_title('ДГУ4')
+                ax[4].bar(reading.T, [self.entity.m.x4[t]() for t in reading.T])
+                ax[4].set_xlim(reading.T1, reading.T2)
+                ax[4].set_ylim(0, 1.1*reading.DGU4_pmax)
+                ax[4].plot(ax[1].get_xlim(), np.array([reading.DGU4_pmax, reading.DGU4_pmax]), 'r--')
+                ax[4].plot(ax[1].get_xlim(), np.array([reading.DGU4_pmin, reading.DGU4_pmin]), 'r--')
+                ax[4].set_title('ДГУ4')
 
-            #     ax[5].bar(reading.T, [self.entity.m.pv1[t]()+ self.entity.m.pv2[t]()+self.entity.m.pv3[t]()+self.entity.m.pv4[t]()+self.entity.m.pv5[t]()+self.entity.m.pv6[t]()+self.entity.m.pv7[t]() for t in reading.T])
-            #     ax[5].set_xlim(reading.T1, reading.T2)
-            #     ax[5].set_ylim(0, 1.1*1000)
-            #     ax[5].bar(reading.T, [reading.init_data_import()[1][t] for t in reading.T], alpha=0.5)
-            #     ax[5].plot(ax[1].get_xlim(), np.array([0, 0]), 'r--')
+                ax[5].bar(reading.T, [self.entity.m.pv1[t]()+ self.entity.m.pv2[t]()+self.entity.m.pv3[t]()+self.entity.m.pv4[t]()+self.entity.m.pv5[t]()+self.entity.m.pv6[t]()+self.entity.m.pv7[t]() for t in reading.T])
+                ax[5].set_xlim(reading.T1, reading.T2)
+                ax[5].set_ylim(0, 1.1*1000)
+                ax[5].bar(reading.T, [reading.init_data_import()[1][:,0][t] for t in reading.T], alpha=0.5)
+                ax[5].plot(ax[1].get_xlim(), np.array([0, 0]), 'r--')
 
-            #     ax[5].set_title('СЭС')
+                ax[5].set_title('СЭС')
 
-            #     ax2 = ax[6].twinx()
-            #     ax2.plot(reading.T, [self.entity.m.soc1[t]() for t in reading.T], color='red', linewidth=2)
-            #     ax[6].bar(reading.T, [self.entity.m.bat1_dch[t]()-self.entity.m.bat1_ch[t]() for t in reading.T])
-            #     ax[6].set_xlim(reading.T1, reading.T2)
-            #     ax[6].set_ylim(-1.1*150, 1.1*150)
-            #     #ax[6].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
-            #     ax2.plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
-            #     ax[6].set_title('СНЭ1')
+                ax2 = ax[6].twinx()
+                ax2.plot(reading.T, [self.entity.m.soc1[t]() for t in reading.T], color='red', linewidth=2)
+                ax[6].bar(reading.T, [self.entity.m.bat1_dch[t]()-self.entity.m.bat1_ch[t]() for t in reading.T])
+                ax[6].set_xlim(reading.T1, reading.T2)
+                ax[6].set_ylim(-1.1*150, 1.1*150)
+                #ax[6].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
+                ax2.plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
+                ax[6].set_title('СНЭ1')
 
-            #     ax3 = ax[7].twinx()
-            #     ax3.plot(reading.T, [self.entity.m.soc2[t]() for t in reading.T], color='red', linewidth=2)
-            #     ax[7].bar(reading.T, [self.entity.m.bat2_dch[t]()-self.entity.m.bat2_ch[t]() for t in reading.T])
-            #     ax[7].set_xlim(reading.T1, reading.T2)
-            #     ax[7].set_ylim(-1.1*150, 1.1*150)
-            #     #ax[7].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
-            #     ax3.plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
-            #     ax[7].set_title('СНЭ2')
+                ax3 = ax[7].twinx()
+                ax3.plot(reading.T, [self.entity.m.soc2[t]() for t in reading.T], color='red', linewidth=2)
+                ax[7].bar(reading.T, [self.entity.m.bat2_dch[t]()-self.entity.m.bat2_ch[t]() for t in reading.T])
+                ax[7].set_xlim(reading.T1, reading.T2)
+                ax[7].set_ylim(-1.1*150, 1.1*150)
+                #ax[7].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
+                ax3.plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
+                ax[7].set_title('СНЭ2')
 
-            #     # u1 = np.fromiter(self.entity.m.u1.get_values().values(), dtype=float)
-            #     # u2 = np.fromiter(self.entity.m.u2.get_values().values(), dtype=float)
-            #     # u3 = np.fromiter(self.entity.m.u3.get_values().values(), dtype=float)
-            #     # u4 = np.fromiter(self.entity.m.u4.get_values().values(), dtype=float)
+                # u1 = np.fromiter(self.entity.m.u1.get_values().values(), dtype=float)
+                # u2 = np.fromiter(self.entity.m.u2.get_values().values(), dtype=float)
+                # u3 = np.fromiter(self.entity.m.u3.get_values().values(), dtype=float)
+                # u4 = np.fromiter(self.entity.m.u4.get_values().values(), dtype=float)
 
-            #     fig.tight_layout()
-            #     plt.show()
+                fig.tight_layout()
+                plt.show()
 
 
         elif (results.solver.termination_condition == TerminationCondition.infeasible):
             print()
             print()
-            print('------')
+            print('--!!!--')
             print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ С ТЕКУЩИМИ ВХОДНЫМИ ДАННЫМИ НЕ ИМЕЕТ РЕШЕНИЯ!')
-            print('-------')
+            print('--!!!--')
             print()
     
     def optimizer_cycling():
@@ -914,11 +937,19 @@ class optimization:
                 print('Считывание входных данных возобновится через 10 секунд')
                 print('******************************************************')
                 print()
+                #plt.plot(ddd[0])
+                #plt.plot(ddd[1])
+                #plt.show()
+
+                print('&&&&&&&&&&&&&&&&&&&&&&')
+                print(reading.init_data_import())
+
                 time.sleep(10)
 
 #сама функция оптимизации
 def the_process():
     fls = reading.files()
+    ddd = reading.init_data_import()
     #первоначальное считывание. Можно потом убрать этот блок
     try:
         opto = optimization()
@@ -943,8 +974,13 @@ def the_process():
         print('Следующая попытка через 5 секунд...')
         print('************************************')
         print()
+        #plt.plot(ddd[0])
+        #plt.plot(ddd[1])
+        #plt.show()
+        print('&&&&&&&&&&&&&&&&&&&&&&')
+        print(reading.init_data_import()[0][:, 0][0])
     optimization.optimizer_cycling()            
-    
+
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
