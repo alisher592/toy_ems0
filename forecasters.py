@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import numpy as np
 import pvlib
@@ -14,10 +16,13 @@ from sklearn.metrics import max_error
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
-from datetime import datetime
+import pytz
+from datetime import datetime, timedelta
 from simplejson import loads
 from requests import get
-from tensorflow import keras
+#from tensorflow import keras
+
+
 
 
 class Load_forecaster:
@@ -34,7 +39,11 @@ class Load_forecaster:
         self.Y_scaler.min_ = pickle.load(open(files_destination[2], 'rb'))[0]
         self.Y_scaler.scale_ = pickle.load(open(files_destination[2], 'rb'))[1]
 
-        self.current_datetime = datetime.now()
+        self.current_datetime = datetime.now().astimezone(pytz.timezone("Asia/Vladivostok")) #+ timedelta(hours=20)
+        self.dtrange = pd.date_range(self.current_datetime, freq='H', periods=24).round('H')
+
+        self.location = pvlib.location.Location(67.55, 133.39, tz='Asia/Vladivostok',
+                                                altitude=140, name='Verkhoyansk')
 
     def hour_of_year(self, date):
         """
@@ -55,13 +64,11 @@ class Load_forecaster:
         # hour = np.array([self.hour_of_year(date) for date in pd.date_range(datetime.now(),
         #                                                                   freq='H', periods=24).round('H')]).T[0:5]
 
-        dtrange = pd.date_range(datetime.now(), freq='H', periods=24).round('H')
-
         features = self.X_scaler.transform(np.array([[self.hour_of_year(date), date.timetuple().tm_yday,
-                                                      date.month, date.day, date.hour] for date in dtrange]))
+                                                      date.month, date.day, date.hour] for date in self.dtrange]))
         raw_fcst = self.model.predict(features)
 
-        load_forecast = pd.DataFrame(index=dtrange)
+        load_forecast = pd.DataFrame(index = self.dtrange)
         load_forecast['Load_Forecast'] = self.Y_scaler.inverse_transform(raw_fcst.reshape(len(raw_fcst), -1))
 
         # plt.plot(self.Y_scaler.inverse_transform(self.model.predict(features).reshape(len(model.predict(ft)), -1)))
@@ -69,12 +76,41 @@ class Load_forecaster:
         return load_forecast
 
 
+    def daylight_hours(self):
+
+
+
+        return pvlib.solarposition.spa_python(self.dtrange, self.location.latitude, self.location.longitude, self.location.altitude)['apparent_zenith'], pvlib.solarposition.spa_python(self.dtrange, self.location.latitude, self.location.longitude,
+                                       self.location.altitude)['zenith']
+
+    def self_consumption_forecast(self):
+
+        self_consumption = pd.DataFrame()
+
+        solar_zenith = pvlib.solarposition.spa_python(self.dtrange, self.location.latitude, self.location.longitude,
+                                       self.location.altitude)['zenith']
+
+        self_consumption['zenith'] = pvlib.solarposition.spa_python(self.dtrange, self.location.latitude, self.location.longitude,
+                                       self.location.altitude)['apparent_zenith']
+
+        self_consumption['Отопление контейнера СЭС'] = 4.4 + 2.2*2
+        self_consumption['Отопление контейнера СНЭ'] = 2
+        self_consumption['Прочее'] = 3
+        self_consumption['Наружное освещение'] = 2.2
+        self_consumption.loc[self_consumption['zenith'] <= 90, 'Наружное освещение'] = 0
+
+        self_consumption['Собственные нужды'] = self_consumption['Отопление контейнера СЭС'] + self_consumption['Отопление контейнера СНЭ'] + self_consumption['Прочее'] + self_consumption['Наружное освещение']
+
+        return self_consumption
+
+
+
 
 
 class PV_forecaster:
 
     def __init__(self, files_destination):
-        self.model = keras.models.load_model(files_destination[0])  # загрузка модели из pickle-файла
+        #self.model = keras.models.load_model(files_destination[0])  # загрузка модели из pickle-файла
 
         self.X_scaler = MinMaxScaler()
         self.Y_scaler = MinMaxScaler()
@@ -302,20 +338,20 @@ class PV_forecaster:
 
 
 
-        return 0.04*mc.results.ac
+        return mc.results.ac #*0.04
 
-# pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
-#             'models/pv_keras/pv_Y_scaler_par.sca']
+pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
+             'models/pv_keras/pv_Y_scaler_par.sca']
 #
-# p = PV_forecaster(pv_files)
+p = PV_forecaster(pv_files)
 #
 # # print(p.get_hourly_irrad_forecast()[1])
 #
-# (p.get_hourly_irrad_forecast()[0]).plot()
-# plt.show()
+#(p.get_hourly_irrad_forecast()[1]).plot()
+#plt.show()
 #
-# (p.get_pv_forecast()*7).plot()
-# plt.show()
+#(p.get_pv_forecast()*7).plot()
+#plt.show()
 
 # linke_turbidity = pvlib.clearsky.lookup_linke_turbidity(p.get_hourly_irrad_forecast()[1].index,
 #                                                         p.location.latitude, p.location.longitude)
@@ -325,11 +361,18 @@ class PV_forecaster:
 # plt.plot(linke_turbidity)
 # plt.show()
 
-files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
-L = Load_forecaster(files)
+#files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
+#L = Load_forecaster(files)
 
-print(L.get_hourly_forecast().index)
+#print(L.get_hourly_forecast().index)
 
+#print(L.self_consumption_forecast())
+
+
+#L.self_consumption_forecast().plot.area()
+#plt.plot(L.self_consumption_forecast())
+
+#plt.show()
 
 # plt.plot(L.get_hourly_forecast())
 # plt.show()

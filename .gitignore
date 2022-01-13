@@ -387,3 +387,5 @@ FodyWeavers.xsd
 .idea/
 *.sln.iml
 /venv/
+/scipampl-7.0.0.win.x86_64.intel.opt.spx2.exe
+/tempo/

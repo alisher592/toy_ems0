@@ -23,13 +23,15 @@ import multiprocessing
 #import cloudpickle
 from pyomo.common.tempfiles import TempfileManager
 import forecasters
-import db_readeru
+
 if not os.path.exists(os.getcwd()+"\\tempo"):
     os.makedirs(os.getcwd()+"\\tempo")
 TempfileManager.tempdir = os.getcwd()+"\\tempo"
 
+logging.basicConfig(filename='C:\project\log.txt', level=logging.INFO,
+                                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
 
-
+logger = logging.getLogger(__name__)
 
 def counter_time():
     start_time = time.time()
@@ -69,14 +71,24 @@ self_consumption_fcst = forecasters.Load_forecaster(load_files).self_consumption
 
 pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
             'models/pv_keras/pv_Y_scaler_par.sca']
-pv_fcst = forecasters.PV_forecaster(pv_files).get_pv_forecast()
+#pv_fcst = forecasters.PV_forecaster(pv_files).get_pv_forecast()
 
 #print(np.asarray(load_fcst)[23])
 
-db_datah = db_readeru.DB_connector().db_to_pd(1)
+fig, ax = plt.subplots(8, 1, figsize=(18, 14))
 
+try:
+    import db_readeru
+    db_datah = db_readeru.DB_connector().db_to_pd(120)
+except Exception as e:
+    print('--!!!--')
+    print('Ошибка при подключении к базе данных!')
+    print('--!!!--')
+    logging.error(traceback.format_exc())
 
 class reading:
+
+
 
     Load=[0,0,0,0,0]
     PV=[0,0,0,0,0,0,0]
@@ -175,11 +187,11 @@ class reading:
         fls = reading.files() #чтение пути к файлу импорта
         
         try:
-            if os.path.isfile(fls[2]):
-            #if len(db_datah) != 0:
+            #if os.path.isfile(fls[2]):
+            if len(db_datah) != 0:
                 #print('СТАРТ ОТСЛЕЖИВАНИЯ ИЗМЕНЕНИЙ', datetime.now())
-                inn=np.genfromtxt((reading.conv(x) for x in open(fls[2])), delimiter=';')
-                if len(inn) == 79:
+                #inn=np.genfromtxt((reading.conv(x) for x in open(fls[2])), delimiter=';')
+                if db_datah[0].shape[1] == 79:
                     out0=pd.read_csv(fls[3], delimiter=';')
                     out=np.array(out0)
 
@@ -198,118 +210,123 @@ class reading:
                     #псевдопрогноз выработки СЭС
                     # PV=[inn[0:7].sum(), inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1), inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1),
                     # inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1),inn[0:7].sum()+random.uniform(-5.0,5.0)*(-1)]
+                    PV = np.array([0]*24)
 
-                    PV = (pv_fcst/1000).values.reshape(24,1)
-                    PV[PV<0] = 0
+                    #print(PV)
 
-                    # # обработка данных по СНЭ из MS SQL
-                    # soc1_before = db_datah['F68'][0]  # последнее на данную минуту значение уровня заряда СНЭ1 # inn[34]/10
-                    # soc2_before = db_datah['F69'][0]  # последнее на данную минуту значение уровня заряда СНЭ2 # inn[35]/10
-
-                    soc1_before = inn[34]/10
-                    soc2_before = inn[35]/10
-
-                    #
-                    # ess1_availability_state = db_datah['F74'][0]
-                    # ess2_availability_state = db_datah['F75'][0]
-                    #
-                    #
-                    # # обработка данных по ДГУ из MS SQL
-                    # # граничные условия по статусам ДГУ
-                    # DGU_starts_statuses = db_readeru.DB_connector().DG_before(db_datah)[0] # список со статусами ДГУ
-                    # DGU_up_times = db_readeru.DB_connector().DG_before(db_datah)[1] # список с числом часов ДГУ в работе
-                    # DGU_down_times = db_readeru.DB_connector().DG_before(db_datah)[2]  # список с числом часов ДГУ в простое
-                    # DGU_availability = db_readeru.DB_connector().DG_before(db_datah)[3]  # список со статусами доступности ДГУ
-                    #
-                    # u1_start = DGU_starts_statuses[0]
-                    # d1_up_before = DGU_up_times[0]
-                    # d1_down_before = DGU_down_times[0]
-                    # d1_availability_state = DGU_availability[0]
-                    #
-                    # u2_start = DGU_starts_statuses[1]
-                    # d2_up_before = DGU_up_times[1]
-                    # d2_down_before = DGU_down_times[1]
-                    # d2_availability_state = DGU_availability[1]
-                    #
-                    # u3_start = DGU_starts_statuses[2]
-                    # d3_up_before = DGU_up_times[2]
-                    # d3_down_before = DGU_down_times[2]
-                    # d3_availability_state = DGU_availability[2]
-                    #
-                    # u4_start = DGU_starts_statuses[3]
-                    # d4_up_before = DGU_up_times[3]
-                    # d4_down_before = DGU_down_times[3]
-                    # d4_availability_state = DGU_availability[3]
+                    #PV = (pv_fcst/1000).values.reshape(24,1)
+                    #PV[PV<0] = 0
 
 
-                    if inn[50]==30 and inn[62]==1 and inn[42]!=0:
-                        u1_start = 1
-                        d1_up_before = 2
-                        d1_down_before = 1
-                    # elif inn[50]==23 and inn[62]==1 and inn[42]!=0:
+
+
+                    # обработка данных по СНЭ из MS SQL
+                    soc1_before = db_datah[0]['F68'][0]/10  # последнее на данную минуту значение уровня заряда СНЭ1 # inn[34]/10
+                    soc2_before = db_datah[0]['F69'][0]/10  # последнее на данную минуту значение уровня заряда СНЭ2 # inn[35]/10
+                    ess1_availability_state = db_datah[0]['F74'][0]
+                    ess2_availability_state = db_datah[0]['F75'][0]
+
+                    # обработка данных по ДГУ из MS SQL
+                    # граничные условия по статусам ДГУ
+                    DGU_starts_statuses = db_readeru.DB_connector().DG_before(db_datah)[0] # список со статусами ДГУ
+                    DGU_up_times = db_readeru.DB_connector().DG_before(db_datah)[1] # список с числом часов ДГУ в работе
+                    DGU_down_times = db_readeru.DB_connector().DG_before(db_datah)[2]  # список с числом часов ДГУ в простое
+                    DGU_availability = db_readeru.DB_connector().DG_before(db_datah)[3]  # список со статусами доступности ДГУ
+
+                    u1_start = DGU_starts_statuses[0]
+                    d1_up_before = DGU_up_times[0]
+                    d1_down_before = DGU_down_times[0]
+                    d1_availability_state = DGU_availability[0]
+
+                    u2_start = DGU_starts_statuses[1]
+                    d2_up_before = DGU_up_times[1]
+                    d2_down_before = DGU_down_times[1]
+                    d2_availability_state = DGU_availability[1]
+
+                    u3_start = DGU_starts_statuses[2]
+                    d3_up_before = DGU_up_times[2]
+                    d3_down_before = DGU_down_times[2]
+                    d3_availability_state = DGU_availability[2]
+
+                    u4_start = DGU_starts_statuses[3]
+                    d4_up_before = DGU_up_times[3]
+                    d4_down_before = DGU_down_times[3]
+                    d4_availability_state = DGU_availability[3]
+
+                    # print(u1_start, d1_up_before, d1_down_before, d1_availability_state, u2_start, d2_up_before, d2_down_before, d2_availability_state,
+                    # u3_start, d3_up_before, d3_down_before, d3_availability_state,
+                    # u4_start, d4_up_before, d4_down_before, d4_availability_state)
+
+
+                    # if inn[50]==30 and inn[62]==1 and inn[42]!=0:
+                    #     u1_start = 1
+                    #     d1_up_before = 2
+                    #     d1_down_before = 1
+                    # # elif inn[50]==23 and inn[62]==1 and inn[42]!=0:
+                    # #     u1_start = 0
+                    # #     d1_up_before = 0
+                    # #     d1_down_before = 3
+                    # else:
                     #     u1_start = 0
                     #     d1_up_before = 0
                     #     d1_down_before = 3
-                    else:
-                        u1_start = 0
-                        d1_up_before = 0
-                        d1_down_before = 3
-                    if inn[51]==30 and inn[63]==1 and inn[43]!=0:
-                        u2_start = 1
-                        d2_up_before = 2
-                        d2_down_before = 1
-                    else:
-                        u2_start = 0
-                        d2_up_before = 0
-                        d2_down_before = 3
-                    if inn[52]==30 and inn[64]==1 and inn[44]!=0:
-                        u3_start = 1
-                        d3_up_before = 2
-                        d3_down_before = 1
-                    else:
-                        u3_start = 0
-                        d3_up_before = 0
-                        d3_down_before = 3
-                    if inn[53]==30 and inn[65]==1 and inn[45]!=0:
-                        u4_start = 1
-                        d4_up_before = 2
-                        d4_down_before = 1
-                    else:
-                        u4_start = 0
-                        d4_up_before = 0
-                        d4_down_before = 3
+                    # if inn[51]==30 and inn[63]==1 and inn[43]!=0:
+                    #     u2_start = 1
+                    #     d2_up_before = 2
+                    #     d2_down_before = 1
+                    # else:
+                    #     u2_start = 0
+                    #     d2_up_before = 0
+                    #     d2_down_before = 3
+                    # if inn[52]==30 and inn[64]==1 and inn[44]!=0:
+                    #     u3_start = 1
+                    #     d3_up_before = 2
+                    #     d3_down_before = 1
+                    # else:
+                    #     u3_start = 0
+                    #     d3_up_before = 0
+                    #     d3_down_before = 3
+                    # if inn[53]==30 and inn[65]==1 and inn[45]!=0:
+                    #     u4_start = 1
+                    #     d4_up_before = 2
+                    #     d4_down_before = 1
+                    # else:
+                    #     u4_start = 0
+                    #     d4_up_before = 0
+                    #     d4_down_before = 3
+                    #
+                    # #ava states
+                    # d1_availability_state = int(inn[62])
+                    # d2_availability_state = int(inn[63])
+                    # d3_availability_state = int(inn[64])
+                    # d4_availability_state = int(inn[65])
+                    #
+                    # ess1_availability_state = int(inn[40])
+                    # ess2_availability_state = int(inn[41])
 
-                    #ava states
-                    d1_availability_state = int(inn[62])
-                    d2_availability_state = int(inn[63])
-                    d3_availability_state = int(inn[64])
-                    d4_availability_state = int(inn[65])
 
-                    ess1_availability_state = int(inn[40])
-                    ess2_availability_state = int(inn[41])
-
-                        #print(PV)
 
                     return [Load, PV, soc1_before, soc2_before, u1_start, d1_up_before, d1_down_before, d1_availability_state, u2_start, d2_up_before, d2_down_before, d2_availability_state,
                     u3_start, d3_up_before, d3_down_before, d3_availability_state,
                     u4_start, d4_up_before, d4_down_before, d4_availability_state, ess1_availability_state, ess2_availability_state, soc1_before, soc2_before]
                 else:
+                    logging.error('Недопустимый ответ от БД. Количество строк в теле ответа не равно 79!')
                     print('')
-                    print('!!!')
-                    print('ОШИБКА! Неверная конфигурация файла с входными данными!')
+                    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    print('ОШИБКА! Недопустимый ответ от базы данных!')
                     print('Количество строк в файле не равно 79!')
-                    print('!!!')
+                    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                     print('')
             else:
+                logging.error('Не удалось подключиться к БД')
                 print('')
-                print('!!!')
-                print('ОШИБКА! Не найден файл с входными данными!')
-                print('!!!')
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                print('ОШИБКА! Не удалось подключиться к базе данных!')
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                 print('')
    
         except Exception as e:
-            logging.basicConfig(filename=fls[0]+'log.txt', level=logging.DEBUG, 
-                                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
+
             logger=logging.getLogger(__name__)
             logging.error(traceback.format_exc())
 
@@ -319,13 +336,13 @@ class reading:
             copyfile(fls[2], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'imported_file.csv')
             copyfile(fls[3], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'exported_file.csv')
             print()
-            print('------')
-            print('ОШИБКА! Не удалось считать файл с входными данными. Лог в ' + fls[0]+'log.txt')
-            print('------')
+            print('-----------------------------------------------------')
+            print('ОШИБКА! Проблема с получением ответа от базы данных!. Лог в ' + fls[0]+'log.txt')
+            print('-----------------------------------------------------')
             print()
-            print('************************************************************')
-            print('Считывание файла входных данных возобновится через 5 секунд')
-            print('************************************************************')
+            print('*************************************************')
+            print('Обращение к БД данных возобновится через 5 секунд')
+            print('*************************************************')
             print()
             time.sleep(5)
             flag = 1
@@ -652,14 +669,14 @@ class opt_pyomo_formulating:
         self.m.ub3 = pyo.Constraint(self.m.T, rule=lambda m, t: reading.DGU3_pmax*m.u3[t] >= m.x3[t])
         self.m.lb4 = pyo.Constraint(self.m.T, rule=lambda m, t: reading.DGU4_pmin*m.u4[t] <= m.x4[t])
         self.m.ub4 = pyo.Constraint(self.m.T, rule=lambda m, t: reading.DGU4_pmax*m.u4[t] >= m.x4[t])
-        
-        self.m.pv1 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV1[t] <= reading.init_data_import()[1][:,0][t]) #7 - число инверторов СЭС
-        self.m.pv2 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV2[t] <= reading.init_data_import()[1][:,0][t])
-        self.m.pv3 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV3[t] <= reading.init_data_import()[1][:,0][t])
-        self.m.pv4 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV4[t] <= reading.init_data_import()[1][:,0][t])
-        self.m.pv5 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV5[t] <= reading.init_data_import()[1][:,0][t])
-        self.m.pv6 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV6[t] <= reading.init_data_import()[1][:,0][t])
-        self.m.pv7 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV7[t] <= reading.init_data_import()[1][:,0][t])
+
+        self.m.pv1 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV1[t] <= 0)  # 7 - число инверторов СЭС
+        self.m.pv2 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV2[t] <= 0)
+        self.m.pv3 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV3[t] <= 0)
+        self.m.pv4 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV4[t] <= 0)
+        self.m.pv5 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV5[t] <= 0)
+        self.m.pv6 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV6[t] <= 0)
+        self.m.pv7 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV7[t] <= 0)
         
         self.m.pv1_curtailment = pyo.Constraint(self.m.T, rule=self.curtailment_control1)
         self.m.pv2_curtailment = pyo.Constraint(self.m.T, rule=self.curtailment_control2)
@@ -720,7 +737,16 @@ class optimization:
         opt =  pyo.SolverFactory('scipampl',executable=os.getcwd()+'\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
         #opt =  pyo.SolverFactory('couenne', executable=os.getcwd() +'\\couenne67.exe')
         #opt =  pyo.SolverFactory('couenne', executable=os.getcwd() +'\\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
+        print()
+        print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
+        print('ПОИСК ОПТИМАЛЬНОГО РЕШЕНИЯ...')
+        print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
+        print()
         results = opt.solve(self.entity.unit_commitment(), logfile='optimizer_log.log', tee=True, timelimit=600, keepfiles=True)
+
+
+
+
         results.write()
         
         #pyo.SolverFactory('mindtpy').solve(m, mip_solver='cbc', nlp_solver='ipopt', tee=True).write()
@@ -734,8 +760,8 @@ class optimization:
                         self.entity.m.bat1_ch.get_values().values()]) 
                         #m.bat1_dch.get_values().values(), m.bat1_ch.get_values().values(), ])
 
-        #if (results.solver.status == SolverStatus.ok) or (results.solver.termination_condition == TerminationCondition.optimal): #sum(np.fromiter(self.entity.m.x1.get_values().values(), dtype=float)) is not None:
-        if 1<2:
+        if (results.solver.status == SolverStatus.ok) or (results.solver.termination_condition == TerminationCondition.optimal): #sum(np.fromiter(self.entity.m.x1.get_values().values(), dtype=float)) is not None:
+        #if 1<2:
             dfout = pd.DataFrame()
             #dfout.index=Load[T].index
             #dfout['Load'] = reading.init_data_import()[0][:,0]
@@ -762,13 +788,13 @@ class optimization:
             dfout['Заряд СНЭ 2'] = self.entity.m.bat2_ch.get_values().values()
             dfout['Уровень заряда СНЭ 1'] = self.entity.m.soc1.get_values().values()
             dfout['Уровень заряда СНЭ 2'] = self.entity.m.soc2.get_values().values()
-            dfout['Инвертор СЭС 1'] = self.entity.m.PV1.get_values().values()
-            dfout['Инвертор СЭС 2'] = self.entity.m.PV2.get_values().values()
-            dfout['Инвертор СЭС 3'] = self.entity.m.PV3.get_values().values()
-            dfout['Инвертор СЭС 4'] = self.entity.m.PV4.get_values().values()
-            dfout['Инвертор СЭС 5'] = self.entity.m.PV5.get_values().values()
-            dfout['Инвертор СЭС 6'] = self.entity.m.PV6.get_values().values()
-            dfout['Инвертор СЭС 7'] = self.entity.m.PV7.get_values().values()
+            dfout['Инвертор СЭС 1'] = 0
+            dfout['Инвертор СЭС 2'] = 0
+            dfout['Инвертор СЭС 3'] = 0
+            dfout['Инвертор СЭС 4'] = 0
+            dfout['Инвертор СЭС 5'] = 0
+            dfout['Инвертор СЭС 6'] = 0
+            dfout['Инвертор СЭС 7'] = 0
             #dfout['bat1_ch'] = -dfout['bat1_ch']
             #dfout['bat2_ch'] = -dfout['bat2_ch']
             #dfout['dd1'] = m.u1.get_values().values()
@@ -793,7 +819,7 @@ class optimization:
 
             #print(dfout)
 
-            dfout.to_csv('dfout.csv')
+            #dfout.to_csv('dfout.csv')
 
             dfout.groupby(['ДГУ1', 'ДГУ2', 'ДГУ3', 'ДГУ4', 'Инвертор СЭС 1',
                         'Инвертор СЭС 2', 'Инвертор СЭС 3', 'Инвертор СЭС 4',
@@ -857,6 +883,7 @@ class optimization:
 
             
             out0.to_csv(reading.files()[3],sep=';',index=False, decimal=',')
+            logging.info('Оптимальное решение найдено...')
             #np.savetxt("C:\PROJECT\Path.csv", np.round(np.genfromtxt('C:\PROJECT\PathFromWrite.csv', delimiter=',')**2, decimals=0), delimiter=",", fmt='%i')
             #originalTime = os.path.getmtime(fileName)
             print()
@@ -867,114 +894,195 @@ class optimization:
             print()
             print('Выходные данные сохранены в ' + reading.files()[3])
             print()
-            print('Следующая попытка через 5 секунд...')
+            print('Следующая попытка через 15 секунд...')
             print()
+            try:
+                if 2>1:
+                    ax[0].cla()
+                    ax[1].cla()
+                    ax[2].cla()
+                    ax[3].cla()
+                    ax[4].cla()
+                    ax[5].cla()
+                    ax[6].cla()
+                    ax[7].cla()
 
-            if 2>1:
-                plt.rcParams['axes.grid'] = True
-                fig, ax = plt.subplots(8, 1, figsize=(18, 14))
-                #print(dfout)
-                fig.suptitle('Оптимальный сценарий. Получен в ' + datetime.now().strftime("%H:%M %d-%m-%Y"))
-                #ax[0].bar(dfout.index, dfout['Нагрузка'], width=10)
-                ax[0].set_xlim(reading.T1, reading.T2)
-                ax[0].set_ylim(0, 1.1 * 900)
-                dfout.index = dfout.index.strftime('%b %d,\n%H:%M')
-                dfout['Нагрузка'].plot.bar(ax=ax[0], rot=1)
-                #ax[0].set_xticks(dfout.index)
-                #ax[0].xaxis.set_major_formatter(mdates.DateFormatter("%m %H:%M"))
-                #ax[0].xaxis.set_minor_formatter(mdates.DateFormatter("%m %H:%M"))
-                #date_form = DateFormatter("%m-%d %H:%M")
-                #ax[0].xaxis.set_major_formatter(date_form)
+                    plt.rcParams['axes.grid'] = True
+                    #print(dfout)
+                    fig.suptitle('Оптимальный сценарий. Получен в ' + datetime.now().strftime("%H:%M %d-%m-%Y"))
+                    #ax[0].bar(dfout.index, dfout['Нагрузка'], width=10)
+                    ax[0].set_xlim(reading.T1, reading.T2)
+                    ax[0].set_ylim(0, 1.1 * 900)
+                    dfout.index = dfout.index.strftime('%b %d,\n%H:%M')
+                    dfout['Нагрузка'].plot.bar(ax=ax[0], rot=1)
+                    #ax[0].set_xticks(dfout.index)
+                    #ax[0].xaxis.set_major_formatter(mdates.DateFormatter("%m %H:%M"))
+                    #ax[0].xaxis.set_minor_formatter(mdates.DateFormatter("%m %H:%M"))
+                    #date_form = DateFormatter("%m-%d %H:%M")
+                    #ax[0].xaxis.set_major_formatter(date_form)
 
 
 
-                #ax[0].bar(reading.T, [reading.init_data_import()[0][:,0][t] for t in reading.T])
+                    #ax[0].bar(reading.T, [reading.init_data_import()[0][:,0][t] for t in reading.T])
 
-                #ax[0].plot(ax[1].get_xlim(), np.array([100, 100]), 'r--')
-                #ax[0].plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
-                ax[0].set_title('Нагрузка + собственные нужды (прогноз)')
-                ax[0].set_ylabel('кВт')
+                    #ax[0].plot(ax[1].get_xlim(), np.array([100, 100]), 'r--')
+                    #ax[0].plot(ax[1].get_xlim(), np.array([30, 30]), 'r--')
+                    ax[0].set_title('Нагрузка + собственные нужды (прогноз)')
+                    ax[0].set_ylabel('кВт')
 
-                #ax[1].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
-                ax[1].set_xlim(reading.T1, reading.T2)
-                ax[1].set_ylim(0, 1.1*reading.DGU1_pmax)
-                ax[1].plot(ax[1].get_xlim(), np.array([reading.DGU1_pmax, reading.DGU1_pmax]), 'r--')
-                ax[1].plot(ax[1].get_xlim(), np.array([reading.DGU1_pmin, reading.DGU1_pmin]), 'r--')
-                ax[1].set_title('ДГУ1')
-                dfout['ДГУ1'].plot.bar(ax=ax[1], rot=1)
-                ax[1].set_ylabel('Активная\nмощность, кВт')
+                    #ax[1].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
+                    ax[1].set_xlim(reading.T1, reading.T2)
+                    ax[1].set_ylim(0, 1.1*reading.DGU1_pmax)
+                    ax[1].plot(ax[1].get_xlim(), np.array([reading.DGU1_pmax, reading.DGU1_pmax]), 'r--')
+                    ax[1].plot(ax[1].get_xlim(), np.array([reading.DGU1_pmin, reading.DGU1_pmin]), 'r--')
+                    ax[1].set_title('ДГУ1')
+                    dfout['ДГУ1'].plot.bar(ax=ax[1], rot=1)
+                    ax[1].set_ylabel('Активная\nмощность, кВт')
 
-                # ax[2].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
-                ax[2].set_xlim(reading.T1, reading.T2)
-                ax[2].set_ylim(0, 1.1 * reading.DGU2_pmax)
-                ax[2].plot(ax[2].get_xlim(), np.array([reading.DGU2_pmax, reading.DGU2_pmax]), 'r--')
-                ax[2].plot(ax[2].get_xlim(), np.array([reading.DGU2_pmin, reading.DGU2_pmin]), 'r--')
-                ax[2].set_title('ДГУ2')
-                dfout['ДГУ2'].plot.bar(ax=ax[2], rot=1)
-                ax[2].set_ylabel('Активная\nмощность, кВт')
+                    # ax[2].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
+                    ax[2].set_xlim(reading.T1, reading.T2)
+                    ax[2].set_ylim(0, 1.1 * reading.DGU2_pmax)
+                    ax[2].plot(ax[2].get_xlim(), np.array([reading.DGU2_pmax, reading.DGU2_pmax]), 'r--')
+                    ax[2].plot(ax[2].get_xlim(), np.array([reading.DGU2_pmin, reading.DGU2_pmin]), 'r--')
+                    ax[2].set_title('ДГУ2')
+                    dfout['ДГУ2'].plot.bar(ax=ax[2], rot=1)
+                    ax[2].set_ylabel('Активная\nмощность, кВт')
 
-                # ax[3].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
-                ax[3].set_xlim(reading.T1, reading.T2)
-                ax[3].set_ylim(0, 1.1 * reading.DGU3_pmax)
-                ax[3].plot(ax[3].get_xlim(), np.array([reading.DGU3_pmax, reading.DGU3_pmax]), 'r--')
-                ax[3].plot(ax[3].get_xlim(), np.array([reading.DGU3_pmin, reading.DGU3_pmin]), 'r--')
-                ax[3].set_title('ДГУ3')
-                dfout['ДГУ3'].plot.bar(ax=ax[3], rot=1)
-                ax[3].set_ylabel('Активная\nмощность, кВт')
+                    # ax[3].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
+                    ax[3].set_xlim(reading.T1, reading.T2)
+                    ax[3].set_ylim(0, 1.1 * reading.DGU3_pmax)
+                    ax[3].plot(ax[3].get_xlim(), np.array([reading.DGU3_pmax, reading.DGU3_pmax]), 'r--')
+                    ax[3].plot(ax[3].get_xlim(), np.array([reading.DGU3_pmin, reading.DGU3_pmin]), 'r--')
+                    ax[3].set_title('ДГУ3')
+                    dfout['ДГУ3'].plot.bar(ax=ax[3], rot=1)
+                    ax[3].set_ylabel('Активная\nмощность, кВт')
 
-                # ax[4].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
-                ax[4].set_xlim(reading.T1, reading.T2)
-                ax[4].set_ylim(0, 1.1 * reading.DGU4_pmax)
-                ax[4].plot(ax[4].get_xlim(), np.array([reading.DGU4_pmax, reading.DGU4_pmax]), 'r--')
-                ax[4].plot(ax[4].get_xlim(), np.array([reading.DGU4_pmin, reading.DGU4_pmin]), 'r--')
-                ax[4].set_title('ДГУ4')
-                dfout['ДГУ4'].plot.bar(ax=ax[4], rot=1)
-                ax[4].set_ylabel('Активная\nмощность, кВт')
+                    # ax[4].bar(reading.T, [self.entity.m.x1[t]() for t in reading.T])
+                    ax[4].set_xlim(reading.T1, reading.T2)
+                    ax[4].set_ylim(0, 1.1 * reading.DGU4_pmax)
+                    ax[4].plot(ax[4].get_xlim(), np.array([reading.DGU4_pmax, reading.DGU4_pmax]), 'r--')
+                    ax[4].plot(ax[4].get_xlim(), np.array([reading.DGU4_pmin, reading.DGU4_pmin]), 'r--')
+                    ax[4].set_title('ДГУ4')
+                    dfout['ДГУ4'].plot.bar(ax=ax[4], rot=1)
+                    ax[4].set_ylabel('Активная\nмощность, кВт')
 
-                #ax[5].bar(reading.T, [self.entity.m.pv1[t]()+ self.entity.m.pv2[t]()+self.entity.m.pv3[t]()+self.entity.m.pv4[t]()+self.entity.m.pv5[t]()+self.entity.m.pv6[t]()+self.entity.m.pv7[t]() for t in reading.T])
-                ax[5].set_xlim(reading.T1, reading.T2)
-                ax[5].set_ylim(0, 1.1*1000)
-                ax[5].bar(reading.T, [reading.init_data_import()[1][:,0][t] for t in reading.T], alpha=0.5)
-                dfout[['Инвертор СЭС 1', 'Инвертор СЭС 2', 'Инвертор СЭС 3', 'Инвертор СЭС 4', 'Инвертор СЭС 5', 'Инвертор СЭС 6', 'Инвертор СЭС 7']].plot.bar(ax=ax[5], rot=1, legend=False)
-                #ax[5].plot(ax[5].get_xlim(), np.array([0, 0]), 'r--')
-                ax[5].set_ylabel('Активная\nмощность, кВт')
-                ax[5].set_title('СЭС')
+                    #ax[5].bar(reading.T, [self.entity.m.pv1[t]()+ self.entity.m.pv2[t]()+self.entity.m.pv3[t]()+self.entity.m.pv4[t]()+self.entity.m.pv5[t]()+self.entity.m.pv6[t]()+self.entity.m.pv7[t]() for t in reading.T])
+                    ax[5].set_xlim(reading.T1, reading.T2)
+                    ax[5].set_ylim(0, 1.1*1000)
+                    ax[5].bar(reading.T, [reading.init_data_import()[1][t] for t in reading.T], alpha=0.5)
+                    dfout[['Инвертор СЭС 1', 'Инвертор СЭС 2', 'Инвертор СЭС 3', 'Инвертор СЭС 4', 'Инвертор СЭС 5', 'Инвертор СЭС 6', 'Инвертор СЭС 7']].plot.bar(ax=ax[5], rot=1, legend=False)
+                    #ax[5].plot(ax[5].get_xlim(), np.array([0, 0]), 'r--')
+                    ax[5].set_ylabel('Активная\nмощность, кВт')
+                    ax[5].set_title('СЭС')
 
-                ax2 = ax[6].twinx()
-                ax[6].set_xlim(reading.T1, reading.T2)
-                ax[6].set_ylim(-1.1 * 150, 1.1 * 150)
-                ax2.set_ylim(0, 105)
-                #ax2.plot(reading.T, [self.entity.m.soc1[t]() for t in reading.T], color='red', linewidth=2, label='Уровень заряда')
-                #ax[6].bar(reading.T, [self.entity.m.bat1_dch[t]()-self.entity.m.bat1_ch[t]() for t in reading.T])
-                (dfout['Разряд СНЭ 1'] - dfout['Заряд СНЭ 1']).plot.bar(ax=ax[6], rot=1)
-                dfout['Уровень заряда СНЭ 1'].plot(ax=ax2, rot=1, legend=True)
-                #ax[6].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
-                ax2.plot(ax[6].get_xlim(), np.array([30, 30]), 'r--')
-                ax[6].set_title('СНЭ1')
-                ax[6].set_ylabel('Активная\nмощность, кВт')
-                ax2.set_ylabel('Уровень заряда\nСНЭ1, %')
+                    ax2 = ax[6].twinx()
+                    ax[6].set_xlim(reading.T1, reading.T2)
+                    ax[6].set_ylim(-1.1 * 150, 1.1 * 150)
+                    ax2.set_ylim(0, 105)
+                    #ax2.plot(reading.T, [self.entity.m.soc1[t]() for t in reading.T], color='red', linewidth=2, label='Уровень заряда')
+                    #ax[6].bar(reading.T, [self.entity.m.bat1_dch[t]()-self.entity.m.bat1_ch[t]() for t in reading.T])
+                    (dfout['Разряд СНЭ 1'] - dfout['Заряд СНЭ 1']).plot.bar(ax=ax[6], rot=1)
+                    dfout['Уровень заряда СНЭ 1'].plot(ax=ax2, rot=1, legend=True)
+                    #ax[6].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
+                    ax2.plot(ax[6].get_xlim(), np.array([30, 30]), 'r--')
+                    ax[6].set_title('СНЭ1')
+                    ax[6].set_ylabel('Активная\nмощность, кВт')
+                    ax2.set_ylabel('Уровень заряда\nСНЭ1, %')
 
-                ax3 = ax[7].twinx()
-                ax[7].set_xlim(reading.T1, reading.T2)
-                ax[7].set_ylim(-1.1*150, 1.1*150)
-                ax3.set_ylim(0, 105)
-                #ax3.plot(reading.T, [self.entity.m.soc2[t]() for t in reading.T], color='red', linewidth=2)
-                #ax[7].bar(reading.T, [self.entity.m.bat2_dch[t]()-self.entity.m.bat2_ch[t]() for t in reading.T])
-                (dfout['Разряд СНЭ 2'] - dfout['Заряд СНЭ 2']).plot.bar(ax=ax[7], rot=1)
-                dfout['Уровень заряда СНЭ 2'].plot(ax=ax3, rot=1, legend=True)
-                #ax[7].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
-                ax3.plot(ax[7].get_xlim(), np.array([30, 30]), 'r--')
-                ax[7].set_title('СНЭ2')
-                ax2.set_ylabel('Уровень заряда\nСНЭ2, %')
+                    ax3 = ax[7].twinx()
+                    ax[7].set_xlim(reading.T1, reading.T2)
+                    ax[7].set_ylim(-1.1*150, 1.1*150)
+                    ax3.set_ylim(0, 105)
+                    #ax3.plot(reading.T, [self.entity.m.soc2[t]() for t in reading.T], color='red', linewidth=2)
+                    #ax[7].bar(reading.T, [self.entity.m.bat2_dch[t]()-self.entity.m.bat2_ch[t]() for t in reading.T])
+                    (dfout['Разряд СНЭ 2'] - dfout['Заряд СНЭ 2']).plot.bar(ax=ax[7], rot=1)
+                    dfout['Уровень заряда СНЭ 2'].plot(ax=ax3, rot=1, legend=True)
+                    #ax[7].plot(ax[1].get_xlim(), np.array([160, 160]), 'r--')
+                    ax3.plot(ax[7].get_xlim(), np.array([30, 30]), 'r--')
+                    ax[7].set_title('СНЭ2')
+                    ax[7].set_ylabel('Активная\nмощность, кВт')
+                    ax3.set_ylabel('Уровень заряда\nСНЭ2, %')
 
-                # u1 = np.fromiter(self.entity.m.u1.get_values().values(), dtype=float)
-                # u2 = np.fromiter(self.entity.m.u2.get_values().values(), dtype=float)
-                # u3 = np.fromiter(self.entity.m.u3.get_values().values(), dtype=float)
-                # u4 = np.fromiter(self.entity.m.u4.get_values().values(), dtype=float)
+                    # u1 = np.fromiter(self.entity.m.u1.get_values().values(), dtype=float)
+                    # u2 = np.fromiter(self.entity.m.u2.get_values().values(), dtype=float)
+                    # u3 = np.fromiter(self.entity.m.u3.get_values().values(), dtype=float)
+                    # u4 = np.fromiter(self.entity.m.u4.get_values().values(), dtype=float)
 
-                fig.tight_layout()
-                plt.savefig('C:\project\opt_schedule.png')
-                plt.show()
+                    # def autolabel(rects):
+                    #     """
+                    #     Attach a text label above each bar displaying its height
+                    #     """
+                    #     for rect in rects:
+                    #         height = rect.get_height()
+                    #         ax.text(rect.get_x() + rect.get_width() / 2., 1.05 * height,
+                    #                 '%d' % int(height),
+                    #                 ha='center', va='bottom')
+
+                    for p in ax[0].patches:
+                        ax[0].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+                    for p in ax[1].patches:
+                        ax[1].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+                    for p in ax[2].patches:
+                        ax[2].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+                    for p in ax[3].patches:
+                        ax[3].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+                    for p in ax[4].patches:
+                        ax[4].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+                    # for p in ax[5].patches:
+                    #     ax[5].annotate(np.round(p.get_height(), decimals=2),
+                    #               (p.get_x() + p.get_width() / 2., p.get_height()),
+                    #                    ha='center', va='center', xytext=(0, 10),
+                    #                                                  textcoords='offset points')
+
+                    for p in ax[6].patches:
+                        ax[6].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+                    for p in ax[7].patches:
+                        ax[7].annotate(np.round(p.get_height(), decimals=2),
+                                  (p.get_x() + p.get_width() / 2., p.get_height()),
+                                       ha='center', va='center', xytext=(0, 10),
+                                                                     textcoords='offset points')
+
+
+
+
+                    fig.tight_layout()
+                    fig.savefig('C:\project\opt_schedule.png')
+                    print('График оптимального сценария сохранен в С:\project\opt_schedule.png')
+                    print()
+                    #plt.show()
+                    plt.close(fig)
+                    #ax2.cla()
+                    #ax3.cla()
+                    time.sleep(10)
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                print('--!!!--')
+                print('Ошибка при построении графика с прогнозом!')
+                print('--!!!--')
 
 
 
@@ -986,9 +1094,6 @@ class optimization:
             print('--!!!--')
             print()
             fls = reading.files()
-            logging.basicConfig(filename=fls[0] + 'log.txt', level=logging.DEBUG,
-                                format='%(asctime)s %(levelname)s %(name)s %(message)s')
-            logger = logging.getLogger(__name__)
             logging.error(traceback.format_exc())
     
     def optimizer_cycling():
@@ -1012,7 +1117,6 @@ class optimization:
                 ddd = reading.init_data_import()
                 opto = optimization()
                 opto.optimizer()
-                time.sleep(10)
                 #     print('++++++++++++++++++++++++++++++++++++++++++++++++++++++')
                 #     print('Считывание входных данных возобновится через 10 секунд')
                 #     print('++++++++++++++++++++++++++++++++++++++++++++++++++++++')
@@ -1042,7 +1146,7 @@ class optimization:
                 print('------')
                 print()
                 print('******************************************************')
-                print('Считывание входных данных возобновится через 10 секунд')
+                print('Считывание входных данных возобновится через 65 секунд')
                 print('******************************************************')
                 print()
                 #plt.plot(ddd[0])
@@ -1052,20 +1156,26 @@ class optimization:
                 #print('&&&&&&&&&&&&&&&&&&&&&&')
                 #print(reading.init_data_import())
 
-                time.sleep(10)
+                time.sleep(65)
 
 #сама функция оптимизации
 def the_process():
     fls = reading.files()
     ddd = reading.init_data_import()
+    #print(ddd)
     #первоначальное считывание. Можно потом убрать этот блок
     try:
         opto = optimization()
+
+        print()
+        print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
+        print('ПОДКЛЮЧЕНИЕ К БД УСПЕШНО.....')
+        print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
+        print()
+
         opto.optimizer()
     except Exception as e:
-        logging.basicConfig(filename=fls[0]+'log.txt', level=logging.DEBUG, 
-                                format='%(asctime)s %(levelname)s %(name)s %(message)s')
-        logger=logging.getLogger(__name__)
+
         logging.error(traceback.format_exc())
 
         if not os.path.exists(fls[0]+'ошибки'):
@@ -1075,11 +1185,11 @@ def the_process():
         copyfile(fls[3], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'exported_file.csv')
         print()
         print('------')
-        print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ С ТЕКУЩИМИ ВХОДНЫМИ ДАННЫМИ НЕРЕШАЕМА!')
+        print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ НЕ ИМЕЕТ РЕШЕНИЯ!')
         print('------')
         print()
         print('************************************')
-        print('Следующая попытка через 5 секунд...')
+        print('Следующая попытка через 65 секунд...')
         print('************************************')
         print()
         #plt.plot(ddd[0])

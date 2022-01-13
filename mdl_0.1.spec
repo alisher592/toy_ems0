@@ -4,8 +4,8 @@
 block_cipher = None
 
 
-a = Analysis(['module_0.1.py'],
-             pathex=[r'C:\\Users\Narynbaev\\Documents\\Odule'],
+a = Analysis(['module_0.1.4.py'],
+             pathex=[r'C:\\Users\Narynbaev\\Documents\\module_0.1.4'],
              binaries=[],
              datas=[('vcomp140.dll', '.')],
              hiddenimports=['pkg_resources.py2_warn','pyomo.common.plugins','pyomo.repn.util',
@@ -24,7 +24,7 @@ a = Analysis(['module_0.1.py'],
                             'pyomo.bilevel.plugins',
                             'pyomo.scripting.plugins',
                             'pyomo.network.plugins',
-                            'pandas._libs.skiplist'
+                            'pandas._libs.skiplist',
              ],
              hookspath=[],
              runtime_hooks=[],
@@ -39,12 +39,12 @@ exe = EXE(pyz,
           a.scripts,
           [],
           exclude_binaries=True,
-          name='module_0.1',
+          name='module_0.1.7',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True )
+          console=True)
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
@@ -52,4 +52,4 @@ coll = COLLECT(exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='module_0.1')
+               name='module_0.1.7')
