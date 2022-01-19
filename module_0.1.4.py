@@ -39,16 +39,31 @@ def counter_time():
     increment = 0
     while True:
         increment+=1
-        with open(fls, 'w') as file:
-            file.write(str('\n'))
-            file.write(str(increment))
-            file.close()
-        print('')
-        print('*****************************************')
-        print('Модуль в работе '+ str(int(time.time()-start_time)) + ' c. Индикатор <'+str(increment)+ '> записан в ' + fls)
-        print('*****************************************')
-        print('') 
-        time.sleep(10)
+        #with open(fls, 'w') as file:
+            # file.write(str('\n'))
+            # file.write(str(increment))
+            # file.close()
+            # time.sleep(10)
+        try:
+            bazah = db_readeru.DB_connector()
+            bazah.indicator_to_sql(increment)
+            print('')
+            print('*****************************************')
+            print('Модуль в работе ' + str(int(time.time() - start_time)) + ' c. Индикатор <' + str(
+                increment) + '> записан в БД')
+            print('*****************************************')
+            print('')
+            time.sleep(10)
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            print('--!!!--')
+            print('Ошибка при записи индикатора связи в БД! Следующая попытка через 10 секунд...')
+            print('--!!!--')
+            time.sleep(10)
+
+
+
+
         # file = open(fls, 'w')
         # file.write('1')
         # file.close
@@ -66,8 +81,7 @@ def counter_time():
 ###t2.start()
 
 load_files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
-load_fcst = forecasters.Load_forecaster(load_files).get_hourly_forecast()
-self_consumption_fcst = forecasters.Load_forecaster(load_files).self_consumption_forecast()
+
 
 pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
             'models/pv_keras/pv_Y_scaler_par.sca']
@@ -178,7 +192,7 @@ class reading:
         with open(os.getcwd()+"\\parameters.txt") as f:
             param_file = f.readlines()
             param_file = [x.strip() for x in param_file]
-        return param_file 
+        return param_file
 
 
 
@@ -187,6 +201,8 @@ class reading:
         fls = reading.files() #чтение пути к файлу импорта
         
         try:
+            load_fcst = forecasters.Load_forecaster(load_files).get_hourly_forecast()
+            self_consumption_fcst = forecasters.Load_forecaster(load_files).self_consumption_forecast()
             #if os.path.isfile(fls[2]):
             if len(db_datah) != 0:
                 #print('СТАРТ ОТСЛЕЖИВАНИЯ ИЗМЕНЕНИЙ', datetime.now())
@@ -762,9 +778,14 @@ class optimization:
 
         if (results.solver.status == SolverStatus.ok) or (results.solver.termination_condition == TerminationCondition.optimal): #sum(np.fromiter(self.entity.m.x1.get_values().values(), dtype=float)) is not None:
         #if 1<2:
+
+            load_fcst = forecasters.Load_forecaster(load_files).get_hourly_forecast()
+            self_consumption_fcst = forecasters.Load_forecaster(load_files).self_consumption_forecast()
+
             dfout = pd.DataFrame()
             #dfout.index=Load[T].index
             #dfout['Load'] = reading.init_data_import()[0][:,0]
+            #dfout['Нагрузка'] = load_fcst
             dfout['Нагрузка'] = load_fcst
             #dfout['Собственные нужды без учета СНЭ'] = self_consumption_fcst
 
@@ -876,14 +897,33 @@ class optimization:
             out[44] = 0
             out[45] = 0
             out[46] = 0
-         
+
+            out[47] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            logging.info(str(out[47]))
+            logging.info(type(out[47]))
+
             out0[:]=[out]
 
+            out0['DT'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-
-            
-            out0.to_csv(reading.files()[3],sep=';',index=False, decimal=',')
             logging.info('Оптимальное решение найдено...')
+
+
+            try:
+                bazah = db_readeru.DB_connector()
+                bazah.decision_to_sql(out)
+                logging.info('Оптимальное решение записано в БД...')
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                print('--!!!--')
+                print('Ошибка при записи оптимального решения в БД!')
+                print('--!!!--')
+
+
+
+            #out0.to_csv(reading.files()[3],sep=';',index=False, decimal=',')
+
             #np.savetxt("C:\PROJECT\Path.csv", np.round(np.genfromtxt('C:\PROJECT\PathFromWrite.csv', delimiter=',')**2, decimals=0), delimiter=",", fmt='%i')
             #originalTime = os.path.getmtime(fileName)
             print()
@@ -892,7 +932,8 @@ class optimization:
             print('ОПТИМАЛЬНОЕ РЕШЕНИЕ НАЙДЕНО...')
             print('##############################')
             print()
-            print('Выходные данные сохранены в ' + reading.files()[3])
+            print('Выходные данные сохранены в БД')
+            #print('Выходные данные сохранены в ' + reading.files()[3])
             print()
             print('Следующая попытка через 15 секунд...')
             print()
