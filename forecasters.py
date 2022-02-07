@@ -20,7 +20,7 @@ import pytz
 from datetime import datetime, timedelta
 from simplejson import loads
 from requests import get
-#from tensorflow import keras
+from tensorflow import keras
 
 
 
@@ -110,7 +110,7 @@ class Load_forecaster:
 class PV_forecaster:
 
     def __init__(self, files_destination):
-        #self.model = keras.models.load_model(files_destination[0])  # загрузка модели из pickle-файла
+        self.model = keras.models.load_model(files_destination[0])  # загрузка модели из pickle-файла
 
         self.X_scaler = MinMaxScaler()
         self.Y_scaler = MinMaxScaler()

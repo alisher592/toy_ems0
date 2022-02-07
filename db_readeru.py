@@ -3,7 +3,8 @@ import pyodbc
 import os
 from sqlalchemy import create_engine
 
-class DB_connector:
+
+class DB_connector():
 
     def __init__(self):
         # инициализация данных для подключения к БД
@@ -29,9 +30,9 @@ class DB_connector:
         :param rows: количество строк для считывания
         :return: pandas series
         """
-        connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
+        # connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
         sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [TEST].[dbo].[Table2] ORDER BY [DT] DESC)[TEST] ORDER BY [DT] DESC"
-        data = pd.read_sql(sql_query, connection, index_col='DT')
+        data = pd.read_sql(sql_query, self.connection, index_col='DT')
         hourly_data_means = data.resample('H').mean()
 
         return data, hourly_data_means
@@ -118,7 +119,6 @@ class DB_connector:
 
         return DG_start_status, DG_hours_up_before, DG_hours_down_before, DG_availability
 
-
     def decision_to_sql(self, df):
         """
 
@@ -132,8 +132,6 @@ class DB_connector:
         #df.to_sql('temporary1', engine, if_exists='append')
 
         sql_query = "UPDATE [TEST].[dbo].[WRITE_FOR_MODULE] SET [Mass_Pess1_set] = " + str(df[0]) + ",[Mass_Pess2_set] = " + str(df[1]) + ",[Mass_Qess_st1_set] = " + str(df[2]) + ",[Mass_Qess_st2_set] = " + str(df[3]) + ",[Mass_Qess1_set] = " + str(df[4]) + ",[Mass_Qess2_set] = " + str(df[5]) + ",[Mass_ESS1_mode_set] = " + str(df[6]) + ",[Mass_ESS2_mode_set] = " + str(df[7]) + ",[Mass_D1_onoff] = ?" + ",[Mass_D2_onoff] = ?" +  ",[Mass_D3_onoff] = ?" + ",[Mass_D4_onoff] = ?" + ",[Mass_Ppv1_lim] = " + str(df[12]) + ",[Mass_Ppv2_lim] = " + str(df[13]) + ",[Mass_Ppv3_lim] = " + str(df[14]) + ",[Mass_Ppv4_lim] = " + str(df[15]) + ",[Mass_Ppv5_lim] = " + str(df[16]) + ",[Mass_Ppv6_lim] = " + str(df[17]) + ",[Mass_Ppv7_lim] = " + str(df[18]) + ",[Mass_Ppv1_lim_cr] = " + str(df[19]) + ",[Mass_Ppv2_lim_cr] = " + str(df[20]) + ",[Mass_Ppv3_lim_cr] = " + str(df[21]) + ",[Mass_Ppv4_lim_cr] = " + str(df[22]) + ",[Mass_Ppv5_lim_cr] = " + str(df[23]) + ",[Mass_Ppv6_lim_cr] = " + str(df[24]) + ",[Mass_Ppv7_lim_cr] = " + str(df[25]) + ",[Mass_Ppv1_lim_sw] = " + str(df[26]) + ",[Mass_Ppv2_lim_sw] = " + str(df[27]) + ",[Mass_Ppv3_lim_sw] = " + str(df[28]) + ",[Mass_Ppv4_lim_sw] = " + str(df[29]) + ",[Mass_Ppv5_lim_sw] = " + str(df[30]) + ",[Mass_Ppv6_lim_sw] = " + str(df[31]) + ",[Mass_Ppv7_lim_sw] = " + str(df[32]) + ",[Mass_PV1_start] = " + str(df[33]) + ",[Mass_PV2_start] = " + str(df[34]) + ",[Mass_PV3_start] = " + str(df[35]) + ",[Mass_PV4_start] = " + str(df[36]) + ",[Mass_PV5_start] = " + str(df[37]) + ",[Mass_PV6_start] = " + str(df[38]) + ",[Mass_PV7_start] = " + str(df[39]) + ",[Mass_PV1_stop] = " + str(df[40]) + ",[Mass_PV2_stop] = " + str(df[41]) + ",[Mass_PV3_stop] = " + str(df[42]) + ",[Mass_PV4_stop] = " + str(df[43]) + ",[Mass_PV5_stop] = " + str(df[44]) + ",[Mass_PV6_stop] = " + str(df[45]) + ",[Mass_PV7_stop] = " + str(df[46]) + ", [DT] = ?"
-
-
 
         cursor = self.connection.cursor()
         cursor.execute(sql_query, df[8], df[9], df[10], df[11], df[47])
@@ -156,7 +154,70 @@ class DB_connector:
 
         return
 
-db_datah = DB_connector().db_to_pd(12)
+    def equipment_availability(self, data_from_sql):
+
+        dgu1_availability = data_from_sql['F23'][0]
+        dgu2_availability = data_from_sql['F24'][0]
+        dgu3_availability = data_from_sql['F25'][0]
+        dgu4_availability = data_from_sql['F26'][0]
+
+        pv1_inv_availability = data_from_sql['F57'][0]
+        pv2_inv_availability = data_from_sql['F58'][0]
+        pv3_inv_availability = data_from_sql['F59'][0]
+        pv4_inv_availability = data_from_sql['F60'][0]
+        pv5_inv_availability = data_from_sql['F61'][0]
+        pv6_inv_availability = data_from_sql['F62'][0]
+        pv7_inv_availability = data_from_sql['F63'][0]
+
+        ess1_inv_availability = data_from_sql['F74'][0]
+        ess2_inv_availability = data_from_sql['F75'][0]
+
+        return [dgu1_availability, dgu2_availability, dgu3_availability, dgu4_availability], \
+               [pv1_inv_availability, pv2_inv_availability, pv3_inv_availability, pv4_inv_availability,
+                pv5_inv_availability, pv6_inv_availability, pv7_inv_availability], [ess1_inv_availability,
+                                                                                    ess2_inv_availability]
+
+    def dgu_states(self, data_from_sql):  # data_from_sql равноценно db_datah[0]
+
+        dgu1_statuses = list()
+        dgu2_statuses = list()
+        dgu3_statuses = list()
+        dgu4_statuses = list()
+
+        for hour in range(0, 3):
+            if data_from_sql['F1'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 0 \
+                    and data_from_sql['F9'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] != 30:
+                dgu1_statuses = dgu1_statuses + [0]
+            elif data_from_sql['F9'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 30:
+                dgu1_statuses = dgu1_statuses + [1]
+
+            if data_from_sql['F2'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 0 \
+                    and data_from_sql['F10'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] != 30:
+                dgu2_statuses = dgu2_statuses + [0]
+            elif data_from_sql['F10'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 30:
+                dgu2_statuses = dgu2_statuses + [1]
+
+            if data_from_sql['F3'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 0 \
+                    and data_from_sql['F11'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] != 30:
+                dgu3_statuses = dgu3_statuses + [0]
+            elif data_from_sql['F11'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 30:
+                dgu3_statuses = dgu3_statuses + [1]
+
+            if data_from_sql['F4'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 0 \
+                    and data_from_sql['F12'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] != 30:
+                dgu4_statuses = dgu4_statuses + [0]
+            elif data_from_sql['F12'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 30:
+                dgu4_statuses = dgu4_statuses + [1]
+
+        return dgu1_statuses, dgu2_statuses, dgu3_statuses, dgu4_statuses
+
+#conn_entity = DB_connector()
+#db_datah = conn_entity.db_to_pd(240)
+
+
+
+
+
 
 # print((db_datah[0].resample('H').mean()['F9'][-6:] == 30).sum())
 
@@ -170,6 +231,17 @@ db_datah = DB_connector().db_to_pd(12)
 
 #db_datah[0].to_csv('wtho.csv')
 
-print(DB_connector().DG_before(db_datah))
+# print(DB_connector().DG_before(db_datah))
 
-print(db_datah[0])
+#print(db_datah[0]['F9'][0])
+
+# print(db_datah[0]['F1'].groupby(db_datah[0].index.hour, sort=False).mean()[0])
+
+# if db_datah[0]['F1'].groupby(db_datah[0].index.hour, sort=False).mean()[0:3].all() == 0:
+#     print('hava')
+#
+#
+#
+# print(dgu_states(db_datah[0]))
+#
+# print(equipment_availability(db_datah[0]))

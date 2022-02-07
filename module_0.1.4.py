@@ -102,8 +102,6 @@ except Exception as e:
 
 class reading:
 
-
-
     Load=[0,0,0,0,0]
     PV=[0,0,0,0,0,0,0]
 
@@ -745,7 +743,11 @@ class opt_pyomo_formulating:
 class optimization:
 
     #m1 = opt_pyomo_formulating.unit_commitment(self)
-    entity = opt_pyomo_formulating()
+
+    def __init__(self):
+        self.fls = reading.files()
+        self.entity = opt_pyomo_formulating()
+
 
     def optimizer(self):
         
@@ -909,31 +911,31 @@ class optimization:
 
             logging.info('Оптимальное решение найдено...')
 
-
-            try:
-                bazah = db_readeru.DB_connector()
-                bazah.decision_to_sql(out)
-                logging.info('Оптимальное решение записано в БД...')
-            except Exception as e:
-                logging.error(traceback.format_exc())
-                print('--!!!--')
-                print('Ошибка при записи оптимального решения в БД!')
-                print('--!!!--')
-
-
-
-            #out0.to_csv(reading.files()[3],sep=';',index=False, decimal=',')
-
-            #np.savetxt("C:\PROJECT\Path.csv", np.round(np.genfromtxt('C:\PROJECT\PathFromWrite.csv', delimiter=',')**2, decimals=0), delimiter=",", fmt='%i')
-            #originalTime = os.path.getmtime(fileName)
             print()
             print()
             print('##############################')
             print('ОПТИМАЛЬНОЕ РЕШЕНИЕ НАЙДЕНО...')
             print('##############################')
             print()
-            print('Выходные данные сохранены в БД')
-            #print('Выходные данные сохранены в ' + reading.files()[3])
+
+            try:
+                bazah = db_readeru.DB_connector()
+                bazah.decision_to_sql(out)
+                logging.info('Оптимальное решение записано в БД...')
+                print()
+                print('Выходные данные сохранены в БД')
+                print()
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                print('--!!!--')
+                print('Ошибка при записи оптимального решения в БД!')
+                print('--!!!--')
+
+            #out0.to_csv(reading.files()[3],sep=';',index=False, decimal=',')
+
+            #np.savetxt("C:\PROJECT\Path.csv", np.round(np.genfromtxt('C:\PROJECT\PathFromWrite.csv', delimiter=',')**2, decimals=0), delimiter=",", fmt='%i')
+            #originalTime = os.path.getmtime(fileName)
+
             print()
             print('Следующая попытка через 15 секунд...')
             print()
@@ -1130,16 +1132,16 @@ class optimization:
         elif (results.solver.termination_condition == TerminationCondition.infeasible):
             print()
             print()
-            print('--!!!--')
+            print('////////////////////////////////////////////////////////////////////////')
             print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ С ТЕКУЩИМИ ВХОДНЫМИ ДАННЫМИ НЕ ИМЕЕТ РЕШЕНИЯ!')
-            print('--!!!--')
+            print('////////////////////////////////////////////////////////////////////////')
             print()
-            fls = reading.files()
+            #fls = reading.files()
             logging.error(traceback.format_exc())
     
-    def optimizer_cycling():
-        fls = reading.files()
-        fileName = fls[2]
+    def optimizer_cycling(self):
+
+        #fileName = self.fls[2]
         # originalTime = os.path.getmtime(fileName) #считываем время изменения файла filename
         # with open(fileName) as f0:
             # file0 = f0.read()
@@ -1155,9 +1157,9 @@ class optimization:
                 # if (os.path.getmtime(fileName) > originalTime):
                     #print('I am trying!')
                     #print('file ' + fls[2] + 'was changed')
-                ddd = reading.init_data_import()
-                opto = optimization()
-                opto.optimizer()
+                #ddd = reading.init_data_import()
+                #opto = optimization()
+                self.optimizer()
                 #     print('++++++++++++++++++++++++++++++++++++++++++++++++++++++')
                 #     print('Считывание входных данных возобновится через 10 секунд')
                 #     print('++++++++++++++++++++++++++++++++++++++++++++++++++++++')
@@ -1171,20 +1173,20 @@ class optimization:
 
             #         originalTime = os.path.getmtime(fileName)
             except Exception as e:
-                logging.basicConfig(filename=fls[0]+'log.txt', level=logging.DEBUG, 
-                                         format='%(asctime)s %(levelname)s %(name)s %(message)s')
-                logger=logging.getLogger(__name__)
+                #logging.basicConfig(filename=self.fls[0]+'log.txt', level=logging.DEBUG,
+                                         #format='%(asctime)s %(levelname)s %(name)s %(message)s')
+                #logger=logging.getLogger(__name__)
                 logging.error(traceback.format_exc())
 
-                if not os.path.exists(fls[0]+'ошибки'):
-                    os.makedirs(fls[0]+'ошибки')
-                dst=os.path.join(fls[0]+'ошибки\\')
-                copyfile(fls[2], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'imported_file.csv')
-                copyfile(fls[3], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'exported_file.csv')
+                #if not os.path.exists(self.fls[0]+'ошибки'):
+                #    os.makedirs(self.fls[0]+'ошибки')
+                #dst=os.path.join(self.fls[0]+'ошибки\\')
+                #copyfile(self.fls[2], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'imported_file.csv')
+                #copyfile(self.fls[3], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'exported_file.csv')
                 print()
-                print('------')
-                print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ С ТЕКУЩИМИ ВХОДНЫМИ ДАННЫМИ НЕРЕШАЕМА!')
-                print('------')
+                print('//////////////////////////////////////////////////////////////////////////////////')
+                print('ОШИБКА ВВОДА-ВЫВОДА ЛИБО ЗАДАЧА ОПТИМИЗАЦИИ С ТЕКУЩИМИ ВХОДНЫМИ ДАННЫМИ НЕРЕШАЕМА!')
+                print('//////////////////////////////////////////////////////////////////////////////////')
                 print()
                 print('******************************************************')
                 print('Считывание входных данных возобновится через 65 секунд')
@@ -1201,44 +1203,44 @@ class optimization:
 
 #сама функция оптимизации
 def the_process():
-    fls = reading.files()
-    ddd = reading.init_data_import()
+    #fls = reading.files()
+    #ddd = reading.init_data_import()
     #print(ddd)
     #первоначальное считывание. Можно потом убрать этот блок
-    try:
-        opto = optimization()
+    #try:
+    opto = optimization()
 
-        print()
-        print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
-        print('ПОДКЛЮЧЕНИЕ К БД УСПЕШНО.....')
-        print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
-        print()
+    print()
+    print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
+    print('ПОДКЛЮЧЕНИЕ К БД УСПЕШНО.....')
+    print('&*&*&*&*&*&*&*&*&*&*&*&*&*&*&')
+    print()
 
-        opto.optimizer()
-    except Exception as e:
-
-        logging.error(traceback.format_exc())
-
-        if not os.path.exists(fls[0]+'ошибки'):
-            os.makedirs(fls[0]+'ошибки')
-        dst=os.path.join(fls[0]+'ошибки\\')
-        copyfile(fls[2], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'imported_file.csv')
-        copyfile(fls[3], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'exported_file.csv')
-        print()
-        print('------')
-        print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ НЕ ИМЕЕТ РЕШЕНИЯ!')
-        print('------')
-        print()
-        print('************************************')
-        print('Следующая попытка через 65 секунд...')
-        print('************************************')
-        print()
-        #plt.plot(ddd[0])
-        #plt.plot(ddd[1])
-        #plt.show()
-        #print('&&&&&&&&&&&&&&&&&&&&&&')
-        #print(reading.init_data_import()[0][:, 0][0])
-    optimization.optimizer_cycling()            
+    opto.optimizer()
+    # except Exception as e:
+    #
+    #     logging.error(traceback.format_exc())
+    #
+    #     if not os.path.exists(fls[0]+'ошибки'):
+    #         os.makedirs(fls[0]+'ошибки')
+    #     dst=os.path.join(fls[0]+'ошибки\\')
+    #     copyfile(fls[2], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'imported_file.csv')
+    #     copyfile(fls[3], dst + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + 'exported_file.csv')
+    #     print()
+    #     print('------')
+    #     print('ОШИБКА! ЗАДАЧА ОПТИМИЗАЦИИ НЕ ИМЕЕТ РЕШЕНИЯ!')
+    #     print('------')
+    #     print()
+    #     print('************************************')
+    #     print('Следующая попытка через 65 секунд...')
+    #     print('************************************')
+    #     print()
+    #     #plt.plot(ddd[0])
+    #     #plt.plot(ddd[1])
+    #     #plt.show()
+    #     #print('&&&&&&&&&&&&&&&&&&&&&&')
+    #     #print(reading.init_data_import()[0][:, 0][0])
+    opto.optimizer_cycling()
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
