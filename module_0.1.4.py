@@ -607,10 +607,10 @@ class opt_pyomo_formulating:
         return self.m.soc2[reading.T1+reading.T2-reading.T1-1] >= reading.soc2_after
 
     def as_one1(self, model, i):
-        return self.m.bat1_dch[i] == self.m.bat2_dch[i] 
+        return self.m.bat1_dch[i] == self.m.bat2_dch[i]
 
     def as_one2(self, model, i):
-        return self.m.bat1_ch[i] == self.m.bat2_ch[i] 
+        return self.m.bat1_ch[i] == self.m.bat2_ch[i]
 
     def unit_commitment(self):
  

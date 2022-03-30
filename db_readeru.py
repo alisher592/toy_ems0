@@ -31,7 +31,7 @@ class DB_connector():
         :return: pandas series
         """
         # connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
-        sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [TEST].[dbo].[Table2] ORDER BY [DT] DESC)[TEST] ORDER BY [DT] DESC"
+        sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [TEST].[dbo].[Table4] ORDER BY [DT] DESC)[TEST] ORDER BY [DT] DESC"
         data = pd.read_sql(sql_query, self.connection, index_col='DT')
         hourly_data_means = data.resample('H').mean()
 
@@ -131,10 +131,33 @@ class DB_connector():
 
         #df.to_sql('temporary1', engine, if_exists='append')
 
-        sql_query = "UPDATE [TEST].[dbo].[WRITE_FOR_MODULE] SET [Mass_Pess1_set] = " + str(df[0]) + ",[Mass_Pess2_set] = " + str(df[1]) + ",[Mass_Qess_st1_set] = " + str(df[2]) + ",[Mass_Qess_st2_set] = " + str(df[3]) + ",[Mass_Qess1_set] = " + str(df[4]) + ",[Mass_Qess2_set] = " + str(df[5]) + ",[Mass_ESS1_mode_set] = " + str(df[6]) + ",[Mass_ESS2_mode_set] = " + str(df[7]) + ",[Mass_D1_onoff] = ?" + ",[Mass_D2_onoff] = ?" +  ",[Mass_D3_onoff] = ?" + ",[Mass_D4_onoff] = ?" + ",[Mass_Ppv1_lim] = " + str(df[12]) + ",[Mass_Ppv2_lim] = " + str(df[13]) + ",[Mass_Ppv3_lim] = " + str(df[14]) + ",[Mass_Ppv4_lim] = " + str(df[15]) + ",[Mass_Ppv5_lim] = " + str(df[16]) + ",[Mass_Ppv6_lim] = " + str(df[17]) + ",[Mass_Ppv7_lim] = " + str(df[18]) + ",[Mass_Ppv1_lim_cr] = " + str(df[19]) + ",[Mass_Ppv2_lim_cr] = " + str(df[20]) + ",[Mass_Ppv3_lim_cr] = " + str(df[21]) + ",[Mass_Ppv4_lim_cr] = " + str(df[22]) + ",[Mass_Ppv5_lim_cr] = " + str(df[23]) + ",[Mass_Ppv6_lim_cr] = " + str(df[24]) + ",[Mass_Ppv7_lim_cr] = " + str(df[25]) + ",[Mass_Ppv1_lim_sw] = " + str(df[26]) + ",[Mass_Ppv2_lim_sw] = " + str(df[27]) + ",[Mass_Ppv3_lim_sw] = " + str(df[28]) + ",[Mass_Ppv4_lim_sw] = " + str(df[29]) + ",[Mass_Ppv5_lim_sw] = " + str(df[30]) + ",[Mass_Ppv6_lim_sw] = " + str(df[31]) + ",[Mass_Ppv7_lim_sw] = " + str(df[32]) + ",[Mass_PV1_start] = " + str(df[33]) + ",[Mass_PV2_start] = " + str(df[34]) + ",[Mass_PV3_start] = " + str(df[35]) + ",[Mass_PV4_start] = " + str(df[36]) + ",[Mass_PV5_start] = " + str(df[37]) + ",[Mass_PV6_start] = " + str(df[38]) + ",[Mass_PV7_start] = " + str(df[39]) + ",[Mass_PV1_stop] = " + str(df[40]) + ",[Mass_PV2_stop] = " + str(df[41]) + ",[Mass_PV3_stop] = " + str(df[42]) + ",[Mass_PV4_stop] = " + str(df[43]) + ",[Mass_PV5_stop] = " + str(df[44]) + ",[Mass_PV6_stop] = " + str(df[45]) + ",[Mass_PV7_stop] = " + str(df[46]) + ", [DT] = ?"
+        sql_query = "UPDATE [TEST].[dbo].[WRITE_FOR_MODULE] SET [Mass_Pess1_set] = " +\
+                    str(df.iloc[0]) + ",[Mass_Pess2_set] = " + str(df.iloc[1]) + ",[Mass_Qess_st1_set] = " +\
+                    str(df.iloc[2]) + ",[Mass_Qess_st2_set] = " + str(df.iloc[3]) + ",[Mass_Qess1_set] = " +\
+                    str(df.iloc[4]) + ",[Mass_Qess2_set] = " + str(df.iloc[5]) + ",[Mass_ESS1_mode_set] = " +\
+                    str(df.iloc[6]) + ",[Mass_ESS2_mode_set] = " + str(df.iloc[7]) + ",[Mass_D1_onoff] = ?" +\
+                    ",[Mass_D2_onoff] = ?" +  ",[Mass_D3_onoff] = ?" + ",[Mass_D4_onoff] = ?" +\
+                    ",[Mass_Ppv1_lim] = " + str(df.iloc[12]) + ",[Mass_Ppv2_lim] = " +\
+                    str(df.iloc[13]) + ",[Mass_Ppv3_lim] = " + str(df.iloc[14]) + ",[Mass_Ppv4_lim] = " +\
+                    str(df.iloc[15]) + ",[Mass_Ppv5_lim] = " + str(df.iloc[16]) + ",[Mass_Ppv6_lim] = " +\
+                    str(df.iloc[17]) + ",[Mass_Ppv7_lim] = " + str(df.iloc[18]) + ",[Mass_Ppv1_lim_cr] = " +\
+                    str(df.iloc[19]) + ",[Mass_Ppv2_lim_cr] = " + str(df.iloc[20]) + ",[Mass_Ppv3_lim_cr] = " +\
+                    str(df.iloc[21]) + ",[Mass_Ppv4_lim_cr] = " + str(df.iloc[22]) + ",[Mass_Ppv5_lim_cr] = " +\
+                    str(df.iloc[23]) + ",[Mass_Ppv6_lim_cr] = " + str(df.iloc[24]) + ",[Mass_Ppv7_lim_cr] = " +\
+                    str(df.iloc[25]) + ",[Mass_Ppv1_lim_sw] = " + str(df.iloc[26]) + ",[Mass_Ppv2_lim_sw] = " +\
+                    str(df.iloc[27]) + ",[Mass_Ppv3_lim_sw] = " + str(df.iloc[28]) + ",[Mass_Ppv4_lim_sw] = " +\
+                    str(df.iloc[29]) + ",[Mass_Ppv5_lim_sw] = " + str(df.iloc[30]) + ",[Mass_Ppv6_lim_sw] = " +\
+                    str(df.iloc[31]) + ",[Mass_Ppv7_lim_sw] = " + str(df.iloc[32]) + ",[Mass_PV1_start] = " +\
+                    str(df.iloc[33]) + ",[Mass_PV2_start] = " + str(df.iloc[34]) + ",[Mass_PV3_start] = " +\
+                    str(df.iloc[35]) + ",[Mass_PV4_start] = " + str(df.iloc[36]) + ",[Mass_PV5_start] = " +\
+                    str(df.iloc[37]) + ",[Mass_PV6_start] = " + str(df.iloc[38]) + ",[Mass_PV7_start] = " +\
+                    str(df.iloc[39]) + ",[Mass_PV1_stop] = " + str(1-df.iloc[33]) + ",[Mass_PV2_stop] = " +\
+                    str(1-df.iloc[34]) + ",[Mass_PV3_stop] = " + str(1-df.iloc[35]) + ",[Mass_PV4_stop] = " +\
+                    str(1-df.iloc[36]) + ",[Mass_PV5_stop] = " + str(1-df.iloc[37]) + ",[Mass_PV6_stop] = " +\
+                    str(1-df.iloc[38]) + ",[Mass_PV7_stop] = " + str(1-df.iloc[39]) + ", [DT] = ?"
 
         cursor = self.connection.cursor()
-        cursor.execute(sql_query, df[8], df[9], df[10], df[11], df[47])
+        cursor.execute(sql_query, df.iloc[8], df.iloc[9], df.iloc[10], df.iloc[11], str(df.iloc[40]))
 
         self.connection.commit()
 
@@ -245,3 +268,5 @@ class DB_connector():
 # print(dgu_states(db_datah[0]))
 #
 # print(equipment_availability(db_datah[0]))
+
+#print(db_datah[0])

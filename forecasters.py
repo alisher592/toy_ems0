@@ -20,7 +20,7 @@ import pytz
 from datetime import datetime, timedelta
 from simplejson import loads
 from requests import get
-from tensorflow import keras
+#from tensorflow import keras
 
 
 
@@ -110,7 +110,9 @@ class Load_forecaster:
 class PV_forecaster:
 
     def __init__(self, files_destination):
-        self.model = keras.models.load_model(files_destination[0])  # загрузка модели из pickle-файла
+        #self.model = keras.models.load_model(files_destination[0])  # загрузка модели из pickle-файла
+
+        self.model = pickle.load(open(files_destination[0], 'rb'))  # загрузка модели из pickle-файла
 
         self.X_scaler = MinMaxScaler()
         self.Y_scaler = MinMaxScaler()
@@ -255,7 +257,7 @@ class PV_forecaster:
 
         poa_irrad_fcst['air_temperature'] = Weather['air_temperature']
         poa_irrad_fcst['wind_speed'] = Weather['wind_speed']
-        poa_irrad_fcst['cloud'] = Weather['cloud_area_fraction_low']
+        poa_irrad_fcst['cloud'] = Weather['cloud_area_fraction']
 
         return irrad_fcst.fillna(0), poa_irrad_fcst.fillna(0)
 
@@ -338,12 +340,12 @@ class PV_forecaster:
 
 
 
-        return mc.results.ac #*0.04
+        return mc.results.ac * 7 #*0.04
 
-pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
-             'models/pv_keras/pv_Y_scaler_par.sca']
+# pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
+#              'models/pv_keras/pv_Y_scaler_par.sca']
 #
-p = PV_forecaster(pv_files)
+#p = PV_forecaster(pv_files)
 #
 # # print(p.get_hourly_irrad_forecast()[1])
 #
