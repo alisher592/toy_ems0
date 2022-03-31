@@ -116,8 +116,8 @@ class Problemah():
 
         # СНЭ
         self.ESS_inv_P_nom = 150  # номинальная единичная активная мощность инверторов СНЭ, кВт
-        self.battery1_dod = 50  # глубина разряда массива АКБ 1, %
-        self.battery2_dod = 50  # глубина разряда массива АКБ 2, %
+        self.battery1_dod = 40  # глубина разряда массива АКБ 1, %
+        self.battery2_dod = 40  # глубина разряда массива АКБ 2, %
 
         # объект Concrete-модели Pyomo
         self.m = pyo.ConcreteModel()
@@ -495,15 +495,15 @@ class Problemah():
     #ограничение глубины разряда СНЭ
     def cnstr_soc1_ctrl(self, m, i):
         if i == self.T1:
-            return self.m.soc1[i] == db_data['F68'][0]/10 - 100*self.m.bat1_dch[i]/(0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency
+            return self.m.soc1[i] == db_data['F68'][0]/10 - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency 0.95 inverter efficiency
         else:
-            return self.m.soc1[i] == self.m.soc1[i-1] - 100*self.m.bat1_dch[i]/(0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency
+            return self.m.soc1[i] == self.m.soc1[i-1] - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency
 
     def cnstr_soc2_ctrl(self, m, i):
         if i == self.T1:
-            return self.m.soc2[i] == db_data['F69'][0]/10 - 100*self.m.bat2_dch[i]/(0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
+            return self.m.soc2[i] == db_data['F69'][0]/10 - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
         else:
-            return self.m.soc2[i] == self.m.soc2[i-1] - 100*self.m.bat2_dch[i]/(0.78*700) + 0.78*100*self.m.bat2_ch[i]/700
+            return self.m.soc2[i] == self.m.soc2[i-1] - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
 
     # СНЭ не должна заряжаться и разряжаться одновременно
     def cnstr_ch_x_dch1(self, m, i):

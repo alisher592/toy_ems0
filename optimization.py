@@ -4,7 +4,8 @@ import pyomo.environ as pyo
 import db_readeru
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 class DecisionSeeking:
@@ -16,7 +17,7 @@ class DecisionSeeking:
 
     def get_latest_data(self):
 
-        datetime = self.data_importer.get_forecasts()[3].index.strftime("%Y-%m-%d %H:%M:%S")
+        datetime = self.data_importer.get_forecasts()[3].index #.strftime("%Y-%m-%d %H:%M:%S")
         db_data = db_readeru.DB_connector().db_to_pd(240)[0]
         total_load = self.data_importer.get_forecasts()[0][:, 0]
         pv_fcst = self.data_importer.get_forecasts()[1][:, 0]
@@ -237,6 +238,100 @@ class DecisionSeeking:
 
         return result_df, decision_list
 
+    def plot_summary(self, df):
+
+        df.index = self.get_latest_data()[5].strftime("%H:%M %d-%m")
+
+        fig, ax = plt.subplots(1, figsize=(20, 20))
+
+
+
+        PV_power = df[['Акт. мощность инвертора СЭС 1, кВт', 'Акт. мощность инвертора СЭС 2, кВт',
+                       'Акт. мощность инвертора СЭС 3, кВт', 'Акт. мощность инвертора СЭС 4, кВт',
+                       'Акт. мощность инвертора СЭС 5, кВт', 'Акт. мощность инвертора СЭС 6, кВт',
+                       'Акт. мощность инвертора СЭС 7, кВт']].sum(axis=1)
+        ax.bar(df.index, PV_power, label='PV', edgecolor="black", width=0.75, hatch='//', color='orange')
+        ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o', color='slateblue')
+        ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 2, кВт'],
+               bottom = -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o',
+               color='darkslateblue')
+
+        ax.bar(df.index, df['Акт. мощность разряда инвертора СНЭ 1, кВт'], bottom = df['Акт. мощность ДГУ 3, кВт'] +
+                                                                               df['Акт. мощность ДГУ 4, кВт'] +
+                                                                               df['Акт. мощность ДГУ 1, кВт'] +
+                                                                                     df['Акт. мощность ДГУ 2, кВт'] +
+                                                                                     PV_power, width=0.75,
+               edgecolor='black', hatch='o',
+               color='slateblue')
+        ax.bar(df.index, df['Акт. мощность разряда инвертора СНЭ 2, кВт'], bottom=df['Акт. мощность ДГУ 3, кВт'] +
+                                                                                   df['Акт. мощность ДГУ 4, кВт'] +
+                                                                                   df['Акт. мощность ДГУ 1, кВт'] +
+                                                                                   df['Акт. мощность ДГУ 2, кВт'] +
+                                                                df['Акт. мощность разряда инвертора СНЭ 1, кВт'] +
+                                                                                   PV_power, width=0.75,
+               edgecolor='black', hatch='o',
+               color='darkslateblue')
+
+
+        ax.bar(df.index, df['Акт. мощность ДГУ 1, кВт'], label='ДГУ 1', bottom=PV_power +
+                                                                               df['Акт. мощность ДГУ 3, кВт'] +
+                                                                               df['Акт. мощность ДГУ 4, кВт'],
+               edgecolor="black", align='center', width=0.75, hatch="//", color='royalblue')
+        ax.bar(df.index, df['Акт. мощность ДГУ 2, кВт'], label='ДГУ 2', bottom=PV_power +
+                                                                               df['Акт. мощность ДГУ 3, кВт'] +
+                                                                               df['Акт. мощность ДГУ 4, кВт'] +
+                                                                               df['Акт. мощность ДГУ 1, кВт'],
+               edgecolor="black", align='center', width=0.75, hatch="//", color='dimgray')
+        ax.bar(df.index, df['Акт. мощность ДГУ 3, кВт'], label='ДГУ 3', bottom=PV_power,
+               edgecolor="black", align='center', width=0.75, hatch="//", color='teal')
+        ax.bar(df.index, df['Акт. мощность ДГУ 4, кВт'], label='ДГУ 4', bottom=PV_power + df['Акт. мощность ДГУ 3, кВт'],
+               edgecolor="black", align='center', width=0.75, hatch="//", color='deepskyblue')
+
+        ax.grid()
+        ax.set_axisbelow(True)
+
+        ax2 = ax.twinx()
+        ax2.set_ylabel('Уровень заряда, %')
+        ax.set_ylabel('Мощность, кВт')
+
+        ax2.plot(df.index, df['Уровень заряда СНЭ 1, кВт'], '--', color='darkred', label='Уровень заряда\nСНЭ 1', linewidth=3,
+                 marker='o', markeredgecolor='black', markersize=10)
+
+        ax2.plot(df.index, df['Уровень заряда СНЭ 2, кВт'], '--', color='darkred', label='Уровень заряда\nСНЭ 2',
+                 linewidth=3,
+                 marker='s', markeredgecolor='black', markersize=10)
+
+        ax.plot(df.index, df['Общая нагрузка, кВт'], color='red', label='Общая нагрузка', linewidth=4, marker='o', markeredgecolor='black',
+                markersize=10)
+
+
+        ax.legend(ncol=3, bbox_to_anchor=(0.9, 1.15), fancybox=True)
+
+        ax.set_xlabel('Дата и время')
+
+        major_ticks = np.arange(-200, 801, 50)
+        minor_ticks = np.arange(-200, 801, 25)
+
+        major_ticks2 = np.arange(0, 101, 10)
+        minor_ticks2 = np.arange(0, 101, 5)
+
+        ax.set_yticks(major_ticks)
+        ax.set_yticks(minor_ticks, minor=True)
+
+        xfmt = mdates.DateFormatter('%H:%M')
+        # ax.xaxis.set_major_formatter(xfmt, fontsize = 15)
+
+        ax.tick_params(axis='x', which='major', rotation=90) #labelsize=15
+        # ax.tick_params(axis='x', which='minor', labelsize=8)
+        ax2.legend(loc='lower left')
+        ax2.patch.set_alpha(0)
+        ax2.set_ylim([30, 100])
+        ax2.grid(None)
+        plt.show()
+
+        return
+
+
 
 
 
@@ -259,3 +354,10 @@ print(resultado[1].loc[0])
 sql_stuff = db_readeru.DB_connector()
 
 sql_stuff.decision_to_sql(resultado[1].loc[0])
+
+ent.plot_summary(resultado[0])
+
+
+
+
+

@@ -1,6 +1,7 @@
 import pandas as pd
 import pyodbc
 import os
+import datetime
 from sqlalchemy import create_engine
 
 
@@ -157,7 +158,7 @@ class DB_connector():
                     str(1-df.iloc[38]) + ",[Mass_PV7_stop] = " + str(1-df.iloc[39]) + ", [DT] = ?"
 
         cursor = self.connection.cursor()
-        cursor.execute(sql_query, df.iloc[8], df.iloc[9], df.iloc[10], df.iloc[11], str(df.iloc[40]))
+        cursor.execute(sql_query, int(df.iloc[8]), int(df.iloc[9]), int(df.iloc[10]), int(df.iloc[11]), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
         self.connection.commit()
 
