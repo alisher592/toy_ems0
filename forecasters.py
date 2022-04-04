@@ -127,7 +127,7 @@ class PV_forecaster:
 
         self.location = pvlib.location.Location(67.55, 133.39, tz='Asia/Vladivostok',
                                                 altitude=140, name='Verkhoyansk')
-        self.surface_tilt = 90 #угол наклона ФЭМ
+        self.surface_tilt = 52 #угол наклона ФЭМ
         self.surface_azimuth = 180 #азимутальный угол установки ФЭМ
 
         self.pv_modules_CEC = pvlib.pvsystem.retrieve_sam(path='base/CEC_Modules.csv')
@@ -226,7 +226,7 @@ class PV_forecaster:
                                          temp_dew=irrad_fcst['dew_temp'],
                                 min_cos_zenith=0.065, max_zenith=87)
 
-        irrad_fcst['dirint_dni'] = dirint
+        irrad_fcst['dirint_dni'] = dirint #DNI_erbs['dni']
         irrad_fcst['clearsky_dni'] = clearsky_dni
 
         disc = pvlib.irradiance.disc(irrad_fcst['ghi'], irrad_fcst['zenith'], irrad_fcst.index,

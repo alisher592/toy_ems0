@@ -2,7 +2,7 @@ import pyomo.environ as pyo
 import numpy as np
 from pyomo.core import simple_constraint_rule
 import os
-
+import sys
 import db_readeru
 
 import forecasters
@@ -12,13 +12,39 @@ class Data_Importer():
 
 
     def __init__(self, rows=240):
-        self.db_connection = db_readeru.DB_connector()
-        self.load_files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
-        self.pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
-                         'models/pv_keras/pv_Y_scaler_par.sca']
-        self.pv_files2 = ['models/mlp_irrad_hourly_weather.vrk', 'models/irr_w_X_scaler_par.sca', 'models/irr_w_Y_scaler_par.sca']
-        self.rowses = rows
-        self.data_from_sql = self.db_connection.db_to_pd(rows=self.rowses)[0]
+
+        try:
+            print()
+            print("...Попытка подключения к БД MS SQL Server...")
+            self.db_connection = db_readeru.DB_connector()
+            print()
+            print("...Подключение успешно!...")
+        except Exception as e:
+            print()
+            print("****** ОШИБКА! Не удалось подключиться к БД MS SQL server! ******")
+            print()
+            print("////// Модуль завершил работу. //////")
+            print()
+            sys.exit(1)
+
+        try:
+            print()
+            print("...Загрузка вспомогательных файлов...")
+            self.load_files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
+            self.pv_files = ['models/pv_keras', 'models/pv_keras/pv_X_scaler_par.sca',
+                             'models/pv_keras/pv_Y_scaler_par.sca']
+            self.pv_files2 = ['models/mlp_irrad_hourly_weather.vrk', 'models/irr_w_X_scaler_par.sca', 'models/irr_w_Y_scaler_par.sca']
+            self.rowses = rows
+            self.data_from_sql = self.db_connection.db_to_pd(rows=self.rowses)[0]
+            print()
+            print("...Вспомогательные файлы успешно загружены...")
+        except Exception as e:
+            print()
+            print("****** ОШИБКА! Не удалось загрузить вспомогательные файлы. ******")
+            print()
+            print("////// Модуль завершил работу. //////")
+            print()
+            sys.exit(1)
 
     def eq_status(self):
         self.data_from_sql = self.db_connection.db_to_pd(self.rowses)[0]
@@ -44,29 +70,37 @@ class Data_Importer():
 
 
 
-
-data_importer = Data_Importer()
-db_data = db_readeru.DB_connector().db_to_pd(240)[0]
+#точка входа
+#data_importer = Data_Importer()
+#db_data = db_readeru.DB_connector().db_to_pd(240)[0]
 
 #print(db_data['F68'][0])
 
-total_load = data_importer.get_forecasts()[0][:, 0]
-pv_fcst = data_importer.get_forecasts()[1][:, 0]
-dgu_states = data_importer.eq_status()[1]
+#total_load = data_importer.get_forecasts()[0][:, 0]
+#pv_fcst = data_importer.get_forecasts()[1][:, 0]
+#dgu_states = data_importer.eq_status()[1]
 
-equipment_availa = data_importer.eq_status()[0]
+#equipment_availa = data_importer.eq_status()[0]
 
 #print(dgu_states)
 
 
-class Problemah():
+class Problemah:
 
-    def __init__(self):
+    def __init__(self, total_load, pv_fcst, dgu_states, equipment_availa, db_data):
         # задаем фиксированные исходные данные
 
         # горизонт прогнозирования/оптимизации
         self.T1 = 0
         self.T2 = 24
+
+        #
+        self.total_load = total_load
+        self.pv_fcst = pv_fcst
+        self.dgu_states = dgu_states
+        self.equipment_availa = equipment_availa
+        self.db_data = db_data
+
 
         # ДГУ
         self.DGU_quantity = 4  # количество ДГУ
@@ -112,7 +146,7 @@ class Problemah():
 
         # СЭС
         self.PV_inv_P_nom = 136  # номинальная единичная активная мощность инверторов СЭС, кВт
-        self.PV_inv_P_fcst = pv_fcst
+        self.PV_inv_P_fcst = self.pv_fcst
 
         # СНЭ
         self.ESS_inv_P_nom = 150  # номинальная единичная активная мощность инверторов СНЭ, кВт
@@ -129,15 +163,19 @@ class Problemah():
         # определение наборов искомых переменных
         self.m.x1 = pyo.Var(self.m.T, domain=pyo.NonNegativeReals, bounds=(0, self.DGU1_P_nom))  # мощность ДГУ 1
         self.m.u1 = pyo.Var(self.m.T, domain=pyo.Binary)  # бинарный статус ДГУ1
+        #self.m.s1 = pyo.Var(self.m.T, domain=pyo.Binary)
 
         self.m.x2 = pyo.Var(self.m.T, domain=pyo.NonNegativeReals, bounds=(0, self.DGU2_P_nom))  # мощность ДГУ 2
         self.m.u2 = pyo.Var(self.m.T, domain=pyo.Binary)  # бинарный статус ДГУ2
+        #self.m.s2 = pyo.Var(self.m.T, domain=pyo.Binary)
 
         self.m.x3 = pyo.Var(self.m.T, domain=pyo.NonNegativeReals, bounds=(0, self.DGU3_P_nom))  # мощность ДГУ 3
         self.m.u3 = pyo.Var(self.m.T, domain=pyo.Binary)  # бинарный статус ДГУ3
+        #self.m.s3 = pyo.Var(self.m.T, domain=pyo.Binary)
 
         self.m.x4 = pyo.Var(self.m.T, domain=pyo.NonNegativeReals, bounds=(0, self.DGU4_P_nom))  # мощность ДГУ 4
         self.m.u4 = pyo.Var(self.m.T, domain=pyo.Binary)  # бинарный статус ДГУ2
+        #self.m.s4 = pyo.Var(self.m.T, domain=pyo.Binary)
 
         self.m.bat1_dch = pyo.Var(self.m.T, domain=pyo.NonNegativeReals, bounds=(0, self.ESS_inv_P_nom))  # разряд СНЭ 1
         self.m.bat1_ch = pyo.Var(self.m.T, domain=pyo.NonNegativeReals, bounds=(0, self.ESS_inv_P_nom))  # разряд СНЭ 1
@@ -219,6 +257,9 @@ class Problemah():
         self.m.DGU3_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_down_time)
         self.m.DGU4_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_down_time)
 
+        #принудительная работа ДГУ
+        self.m.DGU_forced_on = pyo.Constraint(self.m.T, rule=self.DGU_forced)
+
         # # ограничения затрат на запуск ДГУ
         self.m.su1 = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_start_up_cost)
         self.m.su2 = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_start_up_cost)
@@ -278,78 +319,78 @@ class Problemah():
                self.m.PV1[i] * self.m.PV1_u[i] + self.m.PV2[i] * self.m.PV2_u[i] + \
                self.m.PV3[i] * self.m.PV3_u[i] + self.m.PV4[i] * self.m.PV4_u[i] + \
                self.m.PV5[i] * self.m.PV5_u[i] + self.m.PV6[i] * self.m.PV6_u[i] + \
-               self.m.PV7[i] * self.m.PV7_u[i] == total_load[i]
+               self.m.PV7[i] * self.m.PV7_u[i] == self.total_load[i]
 
     def cnstr_dgu1_start_up_cost(self, m, i):
         if i == self.T1:
-            return self.m.suc1[i] >= self.DGU1_startup_cost * (self.m.u1[i] - dgu_states[0][-1])
+            return self.m.suc1[i] >= self.DGU1_startup_cost * (self.m.u1[i] - self.dgu_states[0][-1])
         else:
             return self.m.suc1[i] >= self.DGU1_startup_cost * (self.m.u1[i] - self.m.u1[i - 1])
 
     def cnstr_dgu2_start_up_cost(self, m, i):
         if i == self.T1:
-            return self.m.suc2[i] >= self.DGU2_startup_cost * (self.m.u2[i] - dgu_states[1][-1])
+            return self.m.suc2[i] >= self.DGU2_startup_cost * (self.m.u2[i] - self.dgu_states[1][-1])
         else:
             return self.m.suc2[i] >= self.DGU2_startup_cost * (self.m.u2[i] - self.m.u2[i - 1])
 
     def cnstr_dgu3_start_up_cost(self, m, i):
         if i == self.T1:
-            return self.m.suc3[i] >= self.DGU3_startup_cost * (self.m.u3[i] - dgu_states[2][-1])
+            return self.m.suc3[i] >= self.DGU3_startup_cost * (self.m.u3[i] - self.dgu_states[2][-1])
         else:
             return self.m.suc3[i] >= self.DGU3_startup_cost * (self.m.u3[i] - self.m.u3[i - 1])
 
     def cnstr_dgu4_start_up_cost(self, m, i):
         if i == self.T1:
-            return self.m.suc4[i] >= self.DGU4_startup_cost * (self.m.u4[i] - dgu_states[3][-1])
+            return self.m.suc4[i] >= self.DGU4_startup_cost * (self.m.u4[i] - self.dgu_states[3][-1])
         else:
             return self.m.suc4[i] >= self.DGU4_startup_cost * (self.m.u4[i] - self.m.u4[i - 1])
 
     def cnstr_dgu1_shut_down_cost(self, m, i):
         if i == self.T1:
-            return m.sdc1[i] >= self.DGU1_shutdown_cost * (dgu_states[0][-1] - m.u1[i])
+            return m.sdc1[i] >= self.DGU1_shutdown_cost * (self.dgu_states[0][-1] - m.u1[i])
         else:
             return m.sdc1[i] >= self.DGU1_shutdown_cost * (m.u1[i - 1] - m.u1[i])
 
     def cnstr_dgu2_shut_down_cost(self, m, i):
         if i == self.T1:
-            return m.sdc2[i] >= self.DGU2_shutdown_cost * (dgu_states[1][-1] - m.u2[i])
+            return m.sdc2[i] >= self.DGU2_shutdown_cost * (self.dgu_states[1][-1] - m.u2[i])
         else:
             return m.sdc2[i] >= self.DGU2_shutdown_cost * (m.u2[i - 1] - m.u2[i])
 
     def cnstr_dgu3_shut_down_cost(self, m, i):
         if i == self.T1:
-            return m.sdc3[i] >= self.DGU3_shutdown_cost * (dgu_states[2][-1] - m.u3[i])
+            return m.sdc3[i] >= self.DGU3_shutdown_cost * (self.dgu_states[2][-1] - m.u3[i])
         else:
             return m.sdc3[i] >= self.DGU3_shutdown_cost * (m.u3[i - 1] - m.u3[i])
 
     def cnstr_dgu4_shut_down_cost(self, m, i):
         if i == self.T1:
-            return m.sdc4[i] >= self.DGU4_shutdown_cost * (dgu_states[3][-1] - m.u4[i])
+            return m.sdc4[i] >= self.DGU4_shutdown_cost * (self.dgu_states[3][-1] - m.u4[i])
         else:
             return m.sdc4[i] >= self.DGU4_shutdown_cost * (m.u4[i - 1] - m.u4[i])
 
     def cnstr_curtailment_control1 (self, m, i):
         return self.m.PV1[i]+ self.m.PV2[i]+self.m.PV3[i]+self.m.PV4[i]+self.m.PV5[i]+self.m.PV6[i]+self.m.PV7[i] - \
-               pv_fcst[i] - self.m.bat1_ch[i]/self.ESS_inv_P_nom <= 0
+               self.pv_fcst[i] - self.m.bat1_ch[i]/self.ESS_inv_P_nom <= 0
 
     def cnstr_curtailment_control2 (self, m, i):
         return self.m.PV1[i]+ self.m.PV2[i]+self.m.PV3[i]+self.m.PV4[i]+self.m.PV5[i]+self.m.PV6[i]+self.m.PV7[i] - \
-               pv_fcst[i] - self.m.bat2_ch[i]/self.ESS_inv_P_nom <= 0
+               self.pv_fcst[i] - self.m.bat2_ch[i]/self.ESS_inv_P_nom <= 0
 
     @simple_constraint_rule
     def cnstr_dgu1_min_up_time(self, m, i):
         if i == self.T1:
-            return (dgu_states[0][2] + dgu_states[0][1] + dgu_states[0][0] - self.DGU1_min_up_time) * (
-                    dgu_states[0][-1] - m.u1[i]) >= 0
+            return (self.dgu_states[0][2] + self.dgu_states[0][1] + self.dgu_states[0][0] - self.DGU1_min_up_time) * (
+                    self.dgu_states[0][-1] - m.u1[i]) >= 0
         if i == self.T1 + 1:
             # if d1_past_up_statuses[0] == 0 and d1_past_up_statuses[1] == 0:
             # return ((d1_past_up_statuses[2] + d1_past_up_statuses[1] + m.u1[i-1] - d1_min_up_time)*(m.u1[i-1] - m.u1[i])) >= 0
             # else:
             # return ((d1_past_up_statuses[2] + d1_past_up_statuses[1] + m.u1[i-1] - d1_min_up_time)*(m.u1[i-1] - m.u1[i]) - m.u1[i]) >= 0
-            return (dgu_states[0][2] + dgu_states[0][1] + m.u1[i - 1] - self.DGU1_min_up_time) * (
+            return (self.dgu_states[0][2] + self.dgu_states[0][1] + m.u1[i - 1] - self.DGU1_min_up_time) * (
                         m.u1[i - 1] - m.u1[i]) >= 0
         if i == self.T1 + 2:
-            return (dgu_states[0][2] + m.u1[i - 2] + m.u1[i - 1] - self.DGU1_min_up_time) * (m.u1[i - 1] - m.u1[i]) >= 0
+            return (self.dgu_states[0][2] + m.u1[i - 2] + m.u1[i - 1] - self.DGU1_min_up_time) * (m.u1[i - 1] - m.u1[i]) >= 0
         # elif T1 < i <= T1+2:
         #    uj = []
         #    #uj.append(m.u1[i-1])
@@ -362,27 +403,27 @@ class Problemah():
     @simple_constraint_rule
     def cnstr_dgu2_min_up_time(self, m, i):
         if i == self.T1:
-            return (dgu_states[1][2] + dgu_states[1][1] + dgu_states[1][0] - self.DGU2_min_up_time) * (
-                        dgu_states[1][-1] - m.u2[i]) >= 0
+            return (self.dgu_states[1][2] + self.dgu_states[1][1] + self.dgu_states[1][0] - self.DGU2_min_up_time) * (
+                        self.dgu_states[1][-1] - m.u2[i]) >= 0
         if i == self.T1 + 1:
-            return (dgu_states[1][2] + dgu_states[1][1] + m.u2[i - 1] - self.DGU2_min_up_time) * (
+            return (self.dgu_states[1][2] + self.dgu_states[1][1] + m.u2[i - 1] - self.DGU2_min_up_time) * (
                         m.u2[i - 1] - m.u2[i]) >= 0
         if i == self.T1 + 2:
-            return (dgu_states[1][2] + m.u2[i - 2] + m.u2[i - 1] - self.DGU2_min_up_time) * (m.u2[i - 1] - m.u2[i]) >= 0
+            return (self.dgu_states[1][2] + m.u2[i - 2] + m.u2[i - 1] - self.DGU2_min_up_time) * (m.u2[i - 1] - m.u2[i]) >= 0
         else:
             return (m.u2[i - 1] + m.u2[i - 2] + m.u2[i - 3] - self.DGU2_min_up_time) * (m.u2[i - 1] - m.u2[i]) >= 0
 
     @simple_constraint_rule
     def cnstr_dgu3_min_up_time(self, m, i):
         if i == self.T1:
-            return (dgu_states[2][2] + dgu_states[2][1] + dgu_states[2][0] -
+            return (self.dgu_states[2][2] + self.dgu_states[2][1] + self.dgu_states[2][0] -
                     self.DGU3_min_up_time) * (
-                           dgu_states[2][-1] - m.u3[i]) >= 0
+                           self.dgu_states[2][-1] - m.u3[i]) >= 0
         if i == self.T1 + 1:
-            return (dgu_states[2][2] + dgu_states[2][1] + m.u3[i - 1] - self.DGU3_min_up_time) * (
+            return (self.dgu_states[2][2] + self.dgu_states[2][1] + m.u3[i - 1] - self.DGU3_min_up_time) * (
                     m.u3[i - 1] - m.u3[i]) >= 0
         if i == self.T1 + 2:
-            return (dgu_states[2][2] + m.u3[i - 2] + m.u3[i - 1] - self.DGU3_min_up_time) * (
+            return (self.dgu_states[2][2] + m.u3[i - 2] + m.u3[i - 1] - self.DGU3_min_up_time) * (
                         m.u3[i - 1] - m.u3[i]) >= 0
         else:
             return (m.u3[i - 1] + m.u3[i - 2] + m.u3[i - 3] - self.DGU3_min_up_time) * (m.u3[i - 1] - m.u3[i]) >= 0
@@ -390,14 +431,14 @@ class Problemah():
     @simple_constraint_rule
     def cnstr_dgu4_min_up_time(self, m, i):
         if i == self.T1:
-            return (dgu_states[3][2] + dgu_states[3][1] + dgu_states[3][0] -
+            return (self.dgu_states[3][2] + self.dgu_states[3][1] + self.dgu_states[3][0] -
                     self.DGU4_min_up_time) * (
-                           dgu_states[3][-1] - m.u4[i]) >= 0
+                           self.dgu_states[3][-1] - m.u4[i]) >= 0
         if i == self.T1 + 1:
-            return (dgu_states[3][2] + dgu_states[3][1] + m.u4[i - 1] - self.DGU4_min_up_time) * (
+            return (self.dgu_states[3][2] + self.dgu_states[3][1] + m.u4[i - 1] - self.DGU4_min_up_time) * (
                     m.u2[i - 1] - m.u4[i]) >= 0
         if i == self.T1 + 2:
-            return (dgu_states[3][2] + m.u4[i - 2] + m.u4[i - 1] - self.DGU4_min_up_time) * (
+            return (self.dgu_states[3][2] + m.u4[i - 2] + m.u4[i - 1] - self.DGU4_min_up_time) * (
                     m.u4[i - 1] - m.u4[i]) >= 0
         else:
             return (m.u4[i - 1] + m.u4[i - 2] + m.u4[i - 3] - self.DGU4_min_up_time) * (m.u4[i - 1] - m.u4[i]) >= 0
@@ -405,13 +446,13 @@ class Problemah():
     @simple_constraint_rule
     def cnstr_dgu1_min_down_time(self, m, i):
         if i == self.T1:
-            return (-(1-dgu_states[0][2] + 1-dgu_states[0][1] + 1-dgu_states[0][0])
-                    + self.DGU1_min_down_time) * (-dgu_states[0][2] + m.u1[i]) <= 0
+            return (-(1-self.dgu_states[0][2] + 1-self.dgu_states[0][1] + 1-self.dgu_states[0][0])
+                    + self.DGU1_min_down_time) * (-self.dgu_states[0][2] + m.u1[i]) <= 0
         if i == self.T1 + 1:
-            return (-(1-dgu_states[0][2] + 1-dgu_states[0][1] + (1 - m.u1[i - 1])) + self.DGU1_min_down_time) * (
+            return (-(1-self.dgu_states[0][2] + 1-self.dgu_states[0][1] + (1 - m.u1[i - 1])) + self.DGU1_min_down_time) * (
                         -m.u1[i - 1] + m.u1[i]) <= 0
         if i == self.T1 + 2:
-            return (-(1-dgu_states[0][2] + (1 - m.u1[i - 2]) + (1 - m.u1[i - 1])) + self.DGU1_min_down_time) * (
+            return (-(1-self.dgu_states[0][2] + (1 - m.u1[i - 2]) + (1 - m.u1[i - 1])) + self.DGU1_min_down_time) * (
                         -m.u1[i - 1] + m.u1[i]) <= 0
         # elif i <= T1+2:
         #    uj = []
@@ -426,13 +467,13 @@ class Problemah():
     @simple_constraint_rule
     def cnstr_dgu2_min_down_time(self, m, i):
         if i == self.T1:
-            return (-(1-dgu_states[1][2] + 1-dgu_states[1][1] + 1-dgu_states[1][0]) +
-                    self.DGU2_min_down_time) * (-dgu_states[1][2] + m.u2[i]) <= 0
+            return (-(1-self.dgu_states[1][2] + 1-self.dgu_states[1][1] + 1-self.dgu_states[1][0]) +
+                    self.DGU2_min_down_time) * (-self.dgu_states[1][2] + m.u2[i]) <= 0
         if i == self.T1 + 1:
-            return (-(1-dgu_states[1][2] + 1-dgu_states[1][1] + (1 - m.u2[i - 1])) + self.DGU2_min_down_time) * (
+            return (-(1-self.dgu_states[1][2] + 1-self.dgu_states[1][1] + (1 - m.u2[i - 1])) + self.DGU2_min_down_time) * (
                         -m.u2[i - 1] + m.u2[i]) <= 0
         if i == self.T1 + 2:
-            return (-(1-dgu_states[1][2] + (1 - m.u2[i - 2]) + (1 - m.u2[i - 1])) + self.DGU2_min_down_time) * (
+            return (-(1-self.dgu_states[1][2] + (1 - m.u2[i - 2]) + (1 - m.u2[i - 1])) + self.DGU2_min_down_time) * (
                         -m.u2[i - 1] + m.u2[i]) <= 0
         else:
             return (-(1 - m.u2[i - 1] + 1 - m.u2[i - 2] + 1 - m.u2[i - 3]) + self.DGU2_min_down_time) * (
@@ -441,13 +482,13 @@ class Problemah():
     @simple_constraint_rule
     def cnstr_dgu3_min_down_time(self, m, i):
         if i == self.T1:
-            return (-(1-dgu_states[2][2] + 1-dgu_states[2][1] + 1-dgu_states[2][0]) +
-                    self.DGU3_min_down_time) * (-dgu_states[2][2] + m.u3[i]) <= 0
+            return (-(1-self.dgu_states[2][2] + 1-self.dgu_states[2][1] + 1-self.dgu_states[2][0]) +
+                    self.DGU3_min_down_time) * (-self.dgu_states[2][2] + m.u3[i]) <= 0
         if i == self.T1 + 1:
-            return (-(1-dgu_states[2][2] + 1-dgu_states[2][1] + (1 - m.u3[i - 1])) + self.DGU3_min_down_time) * (
+            return (-(1-self.dgu_states[2][2] + 1-self.dgu_states[2][1] + (1 - m.u3[i - 1])) + self.DGU3_min_down_time) * (
                         -m.u3[i - 1] + m.u3[i]) <= 0
         if i == self.T1 + 2:
-            return (-(1-dgu_states[2][2] + (1 - m.u3[i - 2]) + (1 - m.u3[i - 1])) + self.DGU3_min_down_time) * (
+            return (-(1-self.dgu_states[2][2] + (1 - m.u3[i - 2]) + (1 - m.u3[i - 1])) + self.DGU3_min_down_time) * (
                         -m.u3[i - 1] + m.u3[i]) <= 0
         else:
             return (-(1 - m.u3[i - 1] + 1 - m.u3[i - 2] + 1 - m.u3[i - 3]) + self.DGU3_min_down_time) * (
@@ -456,35 +497,40 @@ class Problemah():
     @simple_constraint_rule
     def cnstr_dgu4_min_down_time(self, m, i):
         if i == self.T1:
-            return (-(1-dgu_states[3][2] + 1-dgu_states[3][1] + 1-dgu_states[3][0]) +
-                    self.DGU4_min_down_time) * (-dgu_states[3][2] + m.u4[i]) <= 0
+            return (-(1-self.dgu_states[3][2] + 1-self.dgu_states[3][1] + 1-self.dgu_states[3][0]) +
+                    self.DGU4_min_down_time) * (-self.dgu_states[3][2] + m.u4[i]) <= 0
         if i == self.T1 + 1:
-            return (-(1-dgu_states[3][2] + 1-dgu_states[3][1] + (1 - m.u4[i - 1])) + self.DGU4_min_down_time) * (
+            return (-(1-self.dgu_states[3][2] + 1-self.dgu_states[3][1] + (1 - m.u4[i - 1])) + self.DGU4_min_down_time) * (
                         -m.u4[i - 1] + m.u4[i]) <= 0
         if i == self.T1 + 2:
-            return (-(1-dgu_states[3][2] + (1 - m.u4[i - 2]) + (1 - m.u4[i - 1])) + self.DGU4_min_down_time) * (
+            return (-(1-self.dgu_states[3][2] + (1 - m.u4[i - 2]) + (1 - m.u4[i - 1])) + self.DGU4_min_down_time) * (
                         -m.u4[i - 1] + m.u4[i]) <= 0
         else:
             return (-(1 - m.u4[i - 1] + 1 - m.u4[i - 2] + 1 - m.u4[i - 3]) + self.DGU4_min_down_time) * (
                         -m.u4[i - 1] + m.u4[i]) <= 0
 
     def cnstr_dgu1_availability(self, m, i):
-        return self.m.u1[i] == self.m.u1[i] * equipment_availa[0][0]
+        return self.m.u1[i] == self.m.u1[i] * self.equipment_availa[0][0]
 
     def cnstr_dgu2_availability(self, m, i):
-        return self.m.u2[i] == self.m.u2[i] * equipment_availa[0][0]
+        return self.m.u2[i] == self.m.u2[i] * self.equipment_availa[0][0]
 
     def cnstr_dgu3_availability(self, m, i):
-        return self.m.u3[i] == self.m.u3[i] * equipment_availa[0][0]
+        return self.m.u3[i] == self.m.u3[i] * self.equipment_availa[0][0]
 
     def cnstr_dgu4_availability(self, m, i):
-        return self.m.u4[i] == self.m.u4[i] * equipment_availa[0][0]
+        return self.m.u4[i] == self.m.u4[i] * self.equipment_availa[0][0]
+
+    def DGU_forced(self, m, i):
+        return m.u1[i] + m.u2[i] + m.u3[i] + m.u4[i] >= 1
+
+
 
     def cnstr_ess1_availability(self, m, i):
-        return self.m.bat1_dch[i] + self.m.bat1_ch[i] == (self.m.bat1_dch[i] + self.m.bat1_ch[i]) * equipment_availa[2][0]
+        return self.m.bat1_dch[i] + self.m.bat1_ch[i] == (self.m.bat1_dch[i] + self.m.bat1_ch[i]) * self.equipment_availa[2][0]
 
     def cnstr_ess2_availability(self, m, i):
-        return self.m.bat2_dch[i] + self.m.bat2_ch[i] == (self.m.bat2_dch[i] + self.m.bat2_ch[i]) * equipment_availa[2][1]
+        return self.m.bat2_dch[i] + self.m.bat2_ch[i] == (self.m.bat2_dch[i] + self.m.bat2_ch[i]) * self.equipment_availa[2][1]
 
     def cnstr_as_one1(self, m, i):
         return self.m.bat1_dch[i] == self.m.bat2_dch[i]
@@ -495,13 +541,13 @@ class Problemah():
     #ограничение глубины разряда СНЭ
     def cnstr_soc1_ctrl(self, m, i):
         if i == self.T1:
-            return self.m.soc1[i] == db_data['F68'][0]/10 - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency 0.95 inverter efficiency
+            return self.m.soc1[i] == self.db_data['F68'][0]/10 - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency 0.95 inverter efficiency
         else:
             return self.m.soc1[i] == self.m.soc1[i-1] - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency
 
     def cnstr_soc2_ctrl(self, m, i):
         if i == self.T1:
-            return self.m.soc2[i] == db_data['F69'][0]/10 - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
+            return self.m.soc2[i] == self.db_data['F69'][0]/10 - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
         else:
             return self.m.soc2[i] == self.m.soc2[i-1] - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
 
@@ -518,6 +564,7 @@ class Problemah():
 
     def cnstr_ess_as_one2(self, m, i):
         return self.m.bat1_ch[i] == self.m.bat2_ch[i]
+
 
 
 # entity = Problemah()
@@ -550,4 +597,6 @@ def optimizatione(model):
     return
 
 #optimizatione(entity.m)
+
+
 

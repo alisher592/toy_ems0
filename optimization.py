@@ -6,25 +6,34 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import sys
+import time
+
 
 
 class DecisionSeeking:
 
-    def __init__(self):
-
-        self.data_importer = formulation.Data_Importer()
+    def __init__(self, db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime):
 
 
-    def get_latest_data(self):
+        self.datetime = datetime #self.data_importer.get_forecasts()[3].index  # .strftime("%Y-%m-%d %H:%M:%S")
+        self.db_data = db_data
+        self.total_load = total_load
+        self.pv_fcst = pv_fcst
+        self.dgu_states = dgu_states
+        self.equipment_availa = equipment_availa
 
-        datetime = self.data_importer.get_forecasts()[3].index #.strftime("%Y-%m-%d %H:%M:%S")
-        db_data = db_readeru.DB_connector().db_to_pd(240)[0]
-        total_load = self.data_importer.get_forecasts()[0][:, 0]
-        pv_fcst = self.data_importer.get_forecasts()[1][:, 0]
-        dgu_states = self.data_importer.eq_status()[1]
-        equipment_availa = self.data_importer.eq_status()[0]
 
-        return db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime
+    # def get_latest_data(self):
+    #
+    #     datetime = self.data_importer.get_forecasts()[3].index #.strftime("%Y-%m-%d %H:%M:%S")
+    #     db_data = db_readeru.DB_connector().db_to_pd(240)[0]
+    #     total_load = self.data_importer.get_forecasts()[0][:, 0]
+    #     pv_fcst = self.data_importer.get_forecasts()[1][:, 0]
+    #     dgu_states = self.data_importer.eq_status()[1]
+    #     equipment_availa = self.data_importer.eq_status()[0]
+    #
+    #     return db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime
 
     def optimizatione(self, model):
 
@@ -40,7 +49,7 @@ class DecisionSeeking:
 
         result_df = pd.DataFrame()
 
-        result_df['Общая нагрузка, кВт'] = formulation.total_load
+        result_df['Общая нагрузка, кВт'] = self.total_load
         result_df['Акт. мощность ДГУ 1, кВт'] = model.x1.get_values().values()
         result_df['Акт. мощность ДГУ 2, кВт'] = model.x2.get_values().values()
         result_df['Акт. мощность ДГУ 3, кВт'] = model.x3.get_values().values()
@@ -184,7 +193,7 @@ class DecisionSeeking:
         decision_list['PV6_start'] = {int(k):int(v) for k,v in model.PV6_u.get_values().items()}.values()
         decision_list['PV7_start'] = {int(k):int(v) for k,v in model.PV7_u.get_values().items()}.values()
 
-        decision_list['DT'] = self.get_latest_data()[5]
+        decision_list['DT'] = self.datetime
 
         #decision_list['PV1_stop'] = 1 - model.PV1_u.get_values().values()
         #decision_list['PV2_stop'] = 1 - model.PV2_u.get_values().values()
@@ -240,7 +249,7 @@ class DecisionSeeking:
 
     def plot_summary(self, df):
 
-        df.index = self.get_latest_data()[5].strftime("%H:%M %d-%m")
+        df.index = self.datetime.strftime("%H:%M %d-%m")
 
         fig, ax = plt.subplots(1, figsize=(20, 20))
 
@@ -260,7 +269,7 @@ class DecisionSeeking:
                                                                                df['Акт. мощность ДГУ 4, кВт'] +
                                                                                df['Акт. мощность ДГУ 1, кВт'] +
                                                                                      df['Акт. мощность ДГУ 2, кВт'] +
-                                                                                     PV_power, width=0.75,
+                                                                                     PV_power, label='Инвертор СНЭ 1', width=0.75,
                edgecolor='black', hatch='o',
                color='slateblue')
         ax.bar(df.index, df['Акт. мощность разряда инвертора СНЭ 2, кВт'], bottom=df['Акт. мощность ДГУ 3, кВт'] +
@@ -268,7 +277,7 @@ class DecisionSeeking:
                                                                                    df['Акт. мощность ДГУ 1, кВт'] +
                                                                                    df['Акт. мощность ДГУ 2, кВт'] +
                                                                 df['Акт. мощность разряда инвертора СНЭ 1, кВт'] +
-                                                                                   PV_power, width=0.75,
+                                                                                   PV_power, label='Инвертор СНЭ 2', width=0.75,
                edgecolor='black', hatch='o',
                color='darkslateblue')
 
@@ -305,7 +314,7 @@ class DecisionSeeking:
                 markersize=10)
 
 
-        ax.legend(ncol=3, bbox_to_anchor=(0.9, 1.15), fancybox=True)
+        ax.legend(ncol=4, bbox_to_anchor=(0.9, 1.15), fancybox=True)
 
         ax.set_xlabel('Дата и время')
 
@@ -335,14 +344,31 @@ class DecisionSeeking:
 
 
 
+try:
+    data_importer = formulation.Data_Importer()
+    datetime = data_importer.get_forecasts()[3].index
+    db_data = db_readeru.DB_connector().db_to_pd(240)[0]
+    total_load = data_importer.get_forecasts()[0][:, 0]
+    pv_fcst = data_importer.get_forecasts()[1][:, 0]
+    dgu_states = data_importer.eq_status()[1]
+    equipment_availa = data_importer.eq_status()[0]
+    ent = DecisionSeeking(total_load, pv_fcst, dgu_states, equipment_availa, db_data, datetime)
+
+except Exception as e:
+    print()
+    print("****** ОШИБКА! Не удалось импортировать данные! ******")
+    print()
+    print("////// Модуль завершил работу. //////")
+    print()
+    sys.exit(1)
 
 
 
-
-ent = DecisionSeeking()
 #print(ent.get_latest_data())
 
-entity = formulation.Problemah()
+
+
+entity = formulation.Problemah(total_load, pv_fcst, dgu_states, equipment_availa, db_data)
 
 
 resultado = ent.optimizatione(entity.m)

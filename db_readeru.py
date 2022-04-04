@@ -23,6 +23,8 @@ class DB_connector():
         with open(os.getcwd()+"\\DB_connection_parameters.txt") as f:
             db_params = f.readlines()
             db_params = [x.strip() for x in db_params]
+            f.close()
+
         return db_params
 
     def db_to_pd(self, rows):

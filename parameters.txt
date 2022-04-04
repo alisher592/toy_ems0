@@ -1,4 +1,2 @@
-C:\project\
-C:\project\check.csv
-C:\project\PathFromWrite.csv
-C:\project\Path.csv
+DGU_forced_mode=1
+solver=1
