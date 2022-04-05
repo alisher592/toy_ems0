@@ -28,6 +28,8 @@ from requests import get
 class Load_forecaster:
 
     def __init__(self, files_destination):
+
+        #вызывается больше 1 раза!
         self.model = pickle.load(open(files_destination[0], 'rb'))  # загрузка модели из pickle-файла
 
         self.X_scaler = MinMaxScaler()
@@ -178,9 +180,9 @@ class PV_forecaster:
                     ['apparent_zenith',
                      'azimuth']]
             else:
-                return ('Ошибка! Сервер не отвечает, либо доступ к API запрещен')
+                return ('****** ОШИБКА! Сервер метеопрогнозов не отвечает, либо доступ к API запрещен! ******')
         except Exception as e:
-            return ('Неизвестная ошибка', e)
+            return ('****** ОШИБКА! Не удалось подключиться к серверу метепрогнозов! ******', e)
         return forecast.iloc[1:horizon + 1]  # возвращает датайфрейм с прогнозом
 
 

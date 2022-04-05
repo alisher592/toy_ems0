@@ -7,13 +7,35 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import sys
+import traceback
+import multiprocessing
+from pyomo.common.tempfiles import TempfileManager
 import time
 
 
+# игнорирование предупреждений. Потом нужно разобраться с каждым
+import warnings
+warnings.filterwarnings("ignore")
+
+
+import logging
+
+
+if not os.path.exists(os.getcwd()+"\\tempo"):
+    os.makedirs(os.getcwd()+"\\tempo")
+
+if not os.path.exists(os.getcwd()+"\\log"):
+    os.makedirs(os.getcwd()+"\\log")
+TempfileManager.tempdir = os.getcwd()+"\\tempo"
+
+logging.basicConfig(filename='.\log\logging.log', level=logging.ERROR,
+                                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
+
+logger = logging.getLogger(__name__)
 
 class DecisionSeeking:
 
-    def __init__(self, db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime):
+    def __init__(self, db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime, solver):
 
 
         self.datetime = datetime #self.data_importer.get_forecasts()[3].index  # .strftime("%Y-%m-%d %H:%M:%S")
@@ -22,6 +44,13 @@ class DecisionSeeking:
         self.pv_fcst = pv_fcst
         self.dgu_states = dgu_states
         self.equipment_availa = equipment_availa
+
+
+        if solver == 'solver=1':
+            self.optimizer = pyo.SolverFactory('couenne', executable=os.getcwd() + '\\couenne67.exe') #'\\couenne67.exe')
+
+        else:
+            self.optimizer = pyo.SolverFactory('scipampl', executable=os.getcwd() + '\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
 
 
     # def get_latest_data(self):
@@ -37,11 +66,11 @@ class DecisionSeeking:
 
     def optimizatione(self, model):
 
-        optimizer = pyo.SolverFactory('scipampl', executable=os.getcwd() + '\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
+        #optimizer = pyo.SolverFactory('scipampl', executable=os.getcwd() + '\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
 
-        # optimizer = pyo.SolverFactory('couenne', executable=os.getcwd() + '\\couenne67.exe')
+        #optimizer = pyo.SolverFactory('couenne', executable=os.getcwd() + '\\couenne67.exe')
 
-        results = optimizer.solve(model, logfile='optimizer_log.log', tee=True, timelimit=600,
+        results = self.optimizer.solve(model, logfile='.\log\optimizer_log.log', tee=True, timelimit=600,
                                   keepfiles=True)
         results.write()
 
@@ -251,7 +280,7 @@ class DecisionSeeking:
 
         df.index = self.datetime.strftime("%H:%M %d-%m")
 
-        fig, ax = plt.subplots(1, figsize=(20, 20))
+        fig, ax = plt.subplots(1, figsize=(25, 15))
 
 
 
@@ -259,7 +288,7 @@ class DecisionSeeking:
                        'Акт. мощность инвертора СЭС 3, кВт', 'Акт. мощность инвертора СЭС 4, кВт',
                        'Акт. мощность инвертора СЭС 5, кВт', 'Акт. мощность инвертора СЭС 6, кВт',
                        'Акт. мощность инвертора СЭС 7, кВт']].sum(axis=1)
-        ax.bar(df.index, PV_power, label='PV', edgecolor="black", width=0.75, hatch='//', color='orange')
+        ax.bar(df.index, PV_power, label='СЭС', edgecolor="black", width=0.75, hatch='//', color='orange')
         ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o', color='slateblue')
         ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 2, кВт'],
                bottom = -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o',
@@ -300,8 +329,8 @@ class DecisionSeeking:
         ax.set_axisbelow(True)
 
         ax2 = ax.twinx()
-        ax2.set_ylabel('Уровень заряда, %')
-        ax.set_ylabel('Мощность, кВт')
+        ax2.set_ylabel('Уровень заряда, %', fontsize=18)
+        ax.set_ylabel('Мощность, кВт', fontsize=18)
 
         ax2.plot(df.index, df['Уровень заряда СНЭ 1, кВт'], '--', color='darkred', label='Уровень заряда\nСНЭ 1', linewidth=3,
                  marker='o', markeredgecolor='black', markersize=10)
@@ -314,9 +343,9 @@ class DecisionSeeking:
                 markersize=10)
 
 
-        ax.legend(ncol=4, bbox_to_anchor=(0.9, 1.15), fancybox=True)
+        ax.legend(ncol=4, bbox_to_anchor=(0.9, 1.15), fancybox=True, fontsize=18)
 
-        ax.set_xlabel('Дата и время')
+        ax.set_xlabel('Дата и время', fontsize=15)
 
         major_ticks = np.arange(-200, 801, 50)
         minor_ticks = np.arange(-200, 801, 25)
@@ -330,58 +359,171 @@ class DecisionSeeking:
         xfmt = mdates.DateFormatter('%H:%M')
         # ax.xaxis.set_major_formatter(xfmt, fontsize = 15)
 
-        ax.tick_params(axis='x', which='major', rotation=90) #labelsize=15
+        ax.tick_params(axis='x', which='major', rotation=90, labelsize=15) #labelsize=15
+        ax.tick_params(axis='y', labelsize=18)
+        ax2.tick_params(axis='y', labelsize=18)
         # ax.tick_params(axis='x', which='minor', labelsize=8)
-        ax2.legend(loc='lower left')
+        ax2.legend(loc='lower left', fontsize=18)
         ax2.patch.set_alpha(0)
         ax2.set_ylim([30, 100])
         ax2.grid(None)
-        plt.show()
+        #plt.show()
+        plt.savefig('оптимальное_решение.png')
 
         return
 
 
 
 
+def the_process():
+    try:
+        #отладить позднее
+        print()
+        print("...Запуск...")
 
-try:
-    data_importer = formulation.Data_Importer()
-    datetime = data_importer.get_forecasts()[3].index
-    db_data = db_readeru.DB_connector().db_to_pd(240)[0]
-    total_load = data_importer.get_forecasts()[0][:, 0]
-    pv_fcst = data_importer.get_forecasts()[1][:, 0]
-    dgu_states = data_importer.eq_status()[1]
-    equipment_availa = data_importer.eq_status()[0]
-    ent = DecisionSeeking(total_load, pv_fcst, dgu_states, equipment_availa, db_data, datetime)
+        # for remaining in range(10, 0, -1):
+        #     sys.stdout.write("\r")
+        #     sys.stdout.write("{:2d} seconds remaining.".format(remaining))
+        #     sys.stdout.flush()
+        #     time.sleep(1)
 
-except Exception as e:
-    print()
-    print("****** ОШИБКА! Не удалось импортировать данные! ******")
-    print()
-    print("////// Модуль завершил работу. //////")
-    print()
-    sys.exit(1)
+        #sys.stdout.write("\rComplete!            \n")
 
 
-
-#print(ent.get_latest_data())
-
-
-
-entity = formulation.Problemah(total_load, pv_fcst, dgu_states, equipment_availa, db_data)
+        with open(os.getcwd() + "\\parameters.txt") as f:
+            parameters = f.readlines()
+            parameters = [x.strip() for x in parameters]
+            f.close()
 
 
-resultado = ent.optimizatione(entity.m)
-print('resultadfo')
-print(resultado[0]['Статус ДГУ 4'])
+        data_importer = formulation.Data_Importer()
+        datetime = data_importer.get_forecasts()[3].index
+        db_data = db_readeru.DB_connector().db_to_pd(240)[0]
+        total_load = data_importer.get_forecasts()[0][:, 0]
 
-print(resultado[1].loc[0])
+        try:
+            print()
+            print("...Выполнение прогнозирования мощности СЭС...")
+            pv_fcst = data_importer.get_forecasts()[1][:, 0]
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            print()
+            print("****** ОШИБКА! Не удалось выполнить прогнозирование мощности СЭС! ******")
+            print()
+            print("////// Модуль завершил работу. //////")
+            print()
+            sys.exit(1)
 
-sql_stuff = db_readeru.DB_connector()
 
-sql_stuff.decision_to_sql(resultado[1].loc[0])
+        dgu_states = data_importer.eq_status()[1]
+        equipment_availa = data_importer.eq_status()[0]
+        ent = DecisionSeeking(db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime, parameters[1])
 
-ent.plot_summary(resultado[0])
+        print()
+        print("...Вспомогательные файлы и данные успешно загружены...")
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        print()
+        print("****** ОШИБКА! Не удалось импортировать данные! ******")
+        print()
+        print("////// Модуль аварийно завершил работу. //////")
+        print()
+        sys.exit(1)
+
+    try:
+        entity = formulation.Problemah(total_load, pv_fcst, dgu_states, equipment_availa, db_data, parameters[0])
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        print()
+        print("****** ОШИБКА! Не удалось корректно сформулировать задачу оптимизации! ******")
+        print()
+        print("////// Модуль аварийно завершил работу. //////")
+        print()
+        sys.exit(1)
+
+    try:
+        print()
+        print("...Выполнение поиска оптимального решения...")
+        print()
+        resultado = ent.optimizatione(entity.m)
+        # print('resultadfo')
+        # print(resultado[0]['Статус ДГУ 4'])
+        # print(resultado[1].loc[0])
+        print()
+        print("...Оптимальное решение найдено!...")
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        print()
+        print("****** ОШИБКА! Задача оптимизации не имеет решения! ******")
+        print()
+        print("////// Модуль аварийно завершил работу. //////")
+        print()
+        sys.exit(1)
+
+    try:
+        #sql_stuff = db_readeru.DB_connector()
+        print()
+        print("...Запись найденного оптимального решения в БД MS SQL Server...")
+        db_readeru.DB_connector().decision_to_sql(resultado[1].loc[0])
+        print()
+        print("...Оптимальное решение успешно записано в БД MS SQL Server...")
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        print()
+        print("****** ОШИБКА! Не удалось записать найденное решение в БД MS SQL Server ******")
+        print()
+        print("////// Модуль аварийно завершил работу. //////")
+        print()
+        sys.exit(1)
+
+    try:
+        print()
+        print("...Запись найденного оптимального решения в графический файл...")
+        ent.plot_summary(resultado[0])
+        print()
+        print("...Решение успешно сохранено в файл оптимальное_решение.png...")
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        print()
+        print("****** ОШИБКА! Не удалось экспортировать найденное решение в графический файл ******")
+        print()
+        print("////// Модуль успешно завершил работу. //////")
+        print()
+        sys.exit(1)
+
+
+the_process()
+
+# def progress():
+#     start_time = time.time()
+#     print('Модуль в работе ' + str(int(time.time() - start_time)))
+#     while True:
+#     # bar_len = 60
+#     # filled_len = int(round(bar_len * count / float(total)))
+#     #
+#     # percents = round(100.0 * count / float(total), 1)
+#     # bar = '=' * filled_len + '-' * (bar_len - filled_len)
+#
+#     # sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
+#     # sys.stdout.flush()
+#
+#         sys.stdout.write('Модуль в работе ' + str(int(time.time() - start_time)))
+#         sys.stdout.write("\033[F")
+#         sys.stdout.flush()
+#         time.sleep(.1)
+
+
+
+# if __name__ == '__main__':
+#     multiprocessing.freeze_support()
+#
+#     p = multiprocessing.Process(target=progress())
+#
+#     p1 = multiprocessing.Process(target=the_process)
+#     p.start()
+#     p1.start()
+#     # if flag == 1:
+#     #     p.stop()
 
 
 

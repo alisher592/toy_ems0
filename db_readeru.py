@@ -17,6 +17,8 @@ class DB_connector():
         self.user = 'UID=' + self.params[3] + ';' #sa;'
         self.password = 'PWD=' + self.params[4] + ';' #KznZN43'
         self.connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
+        self.table = self.params[5]
+        self.table_to_write = self.params[6]
         #self.password = 'PWD=369147'
 
     def param_reader(self):
@@ -34,7 +36,7 @@ class DB_connector():
         :return: pandas series
         """
         # connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
-        sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [TEST].[dbo].[Table4] ORDER BY [DT] DESC)[TEST] ORDER BY [DT] DESC"
+        sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [TEST].[dbo].[" + self.table + "] ORDER BY [DT] DESC)[TEST] ORDER BY [DT] DESC"
         data = pd.read_sql(sql_query, self.connection, index_col='DT')
         hourly_data_means = data.resample('H').mean()
 
@@ -134,7 +136,7 @@ class DB_connector():
 
         #df.to_sql('temporary1', engine, if_exists='append')
 
-        sql_query = "UPDATE [TEST].[dbo].[WRITE_FOR_MODULE] SET [Mass_Pess1_set] = " +\
+        sql_query = "UPDATE [TEST].[dbo].[" + self.table_to_write + "] SET [Mass_Pess1_set] = " +\
                     str(df.iloc[0]) + ",[Mass_Pess2_set] = " + str(df.iloc[1]) + ",[Mass_Qess_st1_set] = " +\
                     str(df.iloc[2]) + ",[Mass_Qess_st2_set] = " + str(df.iloc[3]) + ",[Mass_Qess1_set] = " +\
                     str(df.iloc[4]) + ",[Mass_Qess2_set] = " + str(df.iloc[5]) + ",[Mass_ESS1_mode_set] = " +\

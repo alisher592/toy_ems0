@@ -4,9 +4,14 @@ from pyomo.core import simple_constraint_rule
 import os
 import sys
 import db_readeru
-
+import traceback
+import logging
 import forecasters
 
+logging.basicConfig(filename='.\log\logging.log', level=logging.ERROR,
+                                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
+
+logger = logging.getLogger(__name__)
 
 class Data_Importer():
 
@@ -20,10 +25,11 @@ class Data_Importer():
             print()
             print("...Подключение успешно!...")
         except Exception as e:
+            logging.error(traceback.format_exc())
             print()
             print("****** ОШИБКА! Не удалось подключиться к БД MS SQL server! ******")
             print()
-            print("////// Модуль завершил работу. //////")
+            print("////// Модуль аварийно завершил работу. //////")
             print()
             sys.exit(1)
 
@@ -36,13 +42,13 @@ class Data_Importer():
             self.pv_files2 = ['models/mlp_irrad_hourly_weather.vrk', 'models/irr_w_X_scaler_par.sca', 'models/irr_w_Y_scaler_par.sca']
             self.rowses = rows
             self.data_from_sql = self.db_connection.db_to_pd(rows=self.rowses)[0]
-            print()
-            print("...Вспомогательные файлы успешно загружены...")
+
         except Exception as e:
+            logging.error(traceback.format_exc())
             print()
             print("****** ОШИБКА! Не удалось загрузить вспомогательные файлы. ******")
             print()
-            print("////// Модуль завершил работу. //////")
+            print("////// Модуль аварийно завершил работу. //////")
             print()
             sys.exit(1)
 
@@ -87,7 +93,7 @@ class Data_Importer():
 
 class Problemah:
 
-    def __init__(self, total_load, pv_fcst, dgu_states, equipment_availa, db_data):
+    def __init__(self, total_load, pv_fcst, dgu_states, equipment_availa, db_data, parameters):
         # задаем фиксированные исходные данные
 
         # горизонт прогнозирования/оптимизации
@@ -100,6 +106,7 @@ class Problemah:
         self.dgu_states = dgu_states
         self.equipment_availa = equipment_availa
         self.db_data = db_data
+        self.parameters = parameters #параметры режима ДГУ - принудительный и обычный
 
 
         # ДГУ
@@ -117,9 +124,9 @@ class Problemah:
         self.DGU3_F_a = 0.0491  # коэффициент расходной характеристики ДГУ3
         self.DGU4_F_a = 0.0491  # коэффициент расходной характеристики ДГУ4
         self.DGU1_F_b = 0.3031  # коэффициент расходной характеристики ДГУ1
-        self.DGU2_F_b = 0.3031  # коэффициент расходной характеристики ДГУ2
+        self.DGU2_F_b = 0.3331  # коэффициент расходной характеристики ДГУ2
         self.DGU3_F_b = 0.2788  # коэффициент расходной характеристики ДГУ3
-        self.DGU4_F_b = 0.2788  # коэффициент расходной характеристики ДГУ4
+        self.DGU4_F_b = 0.2988  # коэффициент расходной характеристики ДГУ4
 
         self.DGU1_startup_cost = 1000  # затраты на один холодный пуск ДГУ1, у.е.
         self.DGU2_startup_cost = 1000  # затраты на один холодный пуск ДГУ2, у.е.
@@ -258,7 +265,8 @@ class Problemah:
         self.m.DGU4_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_down_time)
 
         #принудительная работа ДГУ
-        self.m.DGU_forced_on = pyo.Constraint(self.m.T, rule=self.DGU_forced)
+        if self.parameters == 'DGU_forced_mode=1':
+            self.m.DGU_forced_on = pyo.Constraint(self.m.T, rule=self.DGU_forced)
 
         # # ограничения затрат на запуск ДГУ
         self.m.su1 = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_start_up_cost)
@@ -307,9 +315,9 @@ class Problemah:
         self.dgu_states = equipment_availa[1]  # доступность оборудования
 
         # получение прогнозных данных при инициализации
-        self.data_importer = Data_Importer()
-        self.total_load = self.data_importer.get_forecasts()[0][:, 0]
-        self.pv_prod =  self.data_importer.get_forecasts()[1][:, 0]
+        #self.data_importer = Data_Importer()
+        #self.total_load = self.data_importer.get_forecasts()[0][:, 0]
+        #self.pv_prod =  self.data_importer.get_forecasts()[1][:, 0]
 
     # функциональные формулировки ограничений
 
