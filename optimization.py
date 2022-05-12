@@ -36,7 +36,6 @@ class DecisionSeeking:
 
     def __init__(self, db_data, total_load, pv_fcst, dgu_states, equipment_availa, datetime, solver):
 
-
         self.datetime = datetime #self.data_importer.get_forecasts()[3].index  # .strftime("%Y-%m-%d %H:%M:%S")
         self.db_data = db_data
         self.total_load = total_load
@@ -44,13 +43,11 @@ class DecisionSeeking:
         self.dgu_states = dgu_states
         self.equipment_availa = equipment_availa
 
-
         if solver == 'solver=1':
             self.optimizer = pyo.SolverFactory('couenne', executable=os.getcwd() + '\\couenne67.exe') #'\\couenne67.exe')
 
         else:
             self.optimizer = pyo.SolverFactory('scipampl', executable=os.getcwd() + '\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
-
 
     # def get_latest_data(self):
     #
@@ -69,7 +66,7 @@ class DecisionSeeking:
 
         #optimizer = pyo.SolverFactory('couenne', executable=os.getcwd() + '\\couenne67.exe')
 
-        results = self.optimizer.solve(model, logfile='.\log\optimizer_log.log', tee=True, timelimit=600,
+        results = self.optimizer.solve(model, logfile='.\log\optimizer_log.log', tee=True, timelimit=700,
                                   keepfiles=True)
         results.write()
 
@@ -394,11 +391,18 @@ def the_process():
             parameters = [x.strip() for x in parameters]
             f.close()
 
-
         data_importer = formulation.Data_Importer()
         datetime = data_importer.get_forecasts()[3].index
-        db_data = db_readeru.DB_connector().db_to_pd(240)[0]
-        total_load = data_importer.get_forecasts()[0][:, 0]
+
+        # # #
+
+        #db_data = db_readeru.DB_connector().db_to_pd(240)[0] # импортируем данные из БД
+
+        # # #
+
+        db_data = db_readeru.DB_connector().db_from_csv()
+
+        total_load = data_importer.get_forecasts()[0][:, 0] #
 
         try:
             print()
@@ -425,7 +429,7 @@ def the_process():
         print()
         print("****** ОШИБКА! Не удалось импортировать данные! ******")
         print()
-        print("////// Модуль аварийно завершил работу. //////")
+        print("////// Модуль завершил работу. //////")
         print()
         sys.exit(1)
 
@@ -436,7 +440,7 @@ def the_process():
         print()
         print("****** ОШИБКА! Не удалось корректно сформулировать задачу оптимизации! ******")
         print()
-        print("////// Модуль аварийно завершил работу. //////")
+        print("////// Модуль завершил работу. //////")
         print()
         sys.exit(1)
 
@@ -455,7 +459,7 @@ def the_process():
         print()
         print("****** ОШИБКА! Задача оптимизации не имеет решения! ******")
         print()
-        print("////// Модуль аварийно завершил работу. //////")
+        print("////// Модуль завершил работу. //////")
         print()
         sys.exit(1)
 
@@ -471,7 +475,7 @@ def the_process():
         print()
         print("****** ОШИБКА! Не удалось записать найденное решение в БД MS SQL Server ******")
         print()
-        print("////// Модуль аварийно завершил работу. //////")
+        print("////// Модуль завершил работу. //////")
         print()
         sys.exit(1)
 

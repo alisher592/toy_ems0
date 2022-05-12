@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 import pytz
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from simplejson import loads
 from requests import get
 #from tensorflow import keras
@@ -29,7 +29,8 @@ class Load_forecaster:
 
     def __init__(self, files_destination):
 
-        #вызывается больше 1 раза!
+        # вызывается больше 1 раза!
+
         self.model = pickle.load(open(files_destination[0], 'rb'))  # загрузка модели из pickle-файла
 
         self.X_scaler = MinMaxScaler()
@@ -95,13 +96,40 @@ class Load_forecaster:
         self_consumption['zenith'] = pvlib.solarposition.spa_python(self.dtrange, self.location.latitude, self.location.longitude,
                                        self.location.altitude)['apparent_zenith']
 
-        self_consumption['Отопление контейнера СЭС'] = 4.4 + 2.2*2
-        self_consumption['Отопление контейнера СНЭ'] = 2
-        self_consumption['Прочее'] = 3
-        self_consumption['Наружное освещение'] = 2.2
-        self_consumption.loc[self_consumption['zenith'] <= 90, 'Наружное освещение'] = 0
+        current_month = date.today().month
 
-        self_consumption['Собственные нужды'] = self_consumption['Отопление контейнера СЭС'] + self_consumption['Отопление контейнера СНЭ'] + self_consumption['Прочее'] + self_consumption['Наружное освещение']
+        if 6 <= current_month <= 8:
+
+            self_consumption['ЩСН 1 СНЭ'] = 1.39
+            self_consumption['ЩСН РУ 6 СНЭ'] = 0.168
+            self_consumption['ЩУ СНЭ'] = 11.569
+            self_consumption['ЩСН СЭC'] = 0.935
+            self_consumption['ЩСН РУ 6 СЭС'] = 0.16
+            self_consumption['ЩСН 40 фут'] = 2.558
+
+        else:
+
+            self_consumption['ЩСН 1 СНЭ'] = 1.335
+            self_consumption['ЩСН РУ 6 СНЭ'] = 2.106
+            self_consumption['ЩУ СНЭ'] = 11.08
+            self_consumption['ЩСН СЭC'] = 4.49
+            self_consumption['ЩСН РУ 6 СЭС'] = 2.11
+            self_consumption['ЩСН 40 фут'] = 4.72
+
+
+
+        # self_consumption['Отопление контейнера СЭС'] = 4.4 + 2.2*2
+        # self_consumption['Отопление контейнера СНЭ'] = 2
+        # self_consumption['Прочее'] = 3
+        # self_consumption['Наружное освещение'] = 2.2
+        # self_consumption.loc[self_consumption['zenith'] <= 90, 'Наружное освещение'] = 0
+
+        # self_consumption['Собственные нужды'] = self_consumption['Отопление контейнера СЭС'] + self_consumption['Отопление контейнера СНЭ'] + self_consumption['Прочее'] + self_consumption['Наружное освещение']
+
+        self_consumption['Собственные нужды'] = self_consumption['ЩСН 1 СНЭ'] + self_consumption['ЩСН РУ 6 СНЭ'] + \
+                                                self_consumption['ЩУ СНЭ'] + self_consumption['ЩСН СЭC'] + \
+                                                self_consumption['ЩСН РУ 6 СЭС'] + self_consumption['ЩСН 40 фут']
+
 
         return self_consumption
 
@@ -380,3 +408,4 @@ class PV_forecaster:
 
 # plt.plot(L.get_hourly_forecast())
 # plt.show()
+

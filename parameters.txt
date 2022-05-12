@@ -1,2 +1,2 @@
-DGU_forced_mode=1
-solver=1
+DGU_forced_mode=0
+solver=0

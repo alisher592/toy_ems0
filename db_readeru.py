@@ -10,15 +10,17 @@ class DB_connector():
     def __init__(self):
         # инициализация данных для подключения к БД
         self.params = self.param_reader()
-        self.driver = 'Driver={SQL Server};'
-        self.server = 'Server=' + self.params[0] + ';' #192.168.20.139;'
-        self.port = 'PORT=' + self.params[1] + ';' #1433;'
-        self.db = 'Database=' + self.params[2] + ';' #TEST;'
-        self.user = 'UID=' + self.params[3] + ';' #sa;'
-        self.password = 'PWD=' + self.params[4] + ';' #KznZN43'
-        self.connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
-        self.table = self.params[5]
-        self.table_to_write = self.params[6]
+        self.driver = 'Driver={' + self.params[0] + '};'
+        self.server = 'Server=' + self.params[1] + ';' #192.168.20.139;'
+        self.port = 'PORT=' + self.params[2] + ';' #1433;'
+        self.db = 'Database=' + self.params[3] + ';' #TEST;'
+        self.db_raw = self.params[3]
+        self.user = 'UID=' + self.params[4] + ';' #sa;'
+        self.password = 'PWD=' + self.params[5] + ';' #KznZN43'
+        #self.connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
+        self.connection = pyodbc.connect(self.driver + self.server + self.db + "Trusted_Connection=yes;")
+        self.table = self.params[6]
+        self.table_to_write = self.params[7]
         #self.password = 'PWD=369147'
 
     def param_reader(self):
@@ -36,11 +38,26 @@ class DB_connector():
         :return: pandas series
         """
         # connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
-        sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [TEST].[dbo].[" + self.table + "] ORDER BY [DT] DESC)[TEST] ORDER BY [DT] DESC"
+        sql_query = "SELECT * FROM (SELECT TOP " + str(rows) + " * FROM [" + self.db_raw + "].[dbo].[" + self.table + "] ORDER BY [DT] DESC)[" + self.db_raw + "] ORDER BY [DT] DESC"
         data = pd.read_sql(sql_query, self.connection, index_col='DT')
         hourly_data_means = data.resample('H').mean()
+        # data.to_csv('datah.csv')
+        # hourly_data_means.to_csv('hdatah.csv')
 
         return data, hourly_data_means
+
+    def db_from_csv(self):
+
+
+        data = pd.read_csv('datah.csv', index_col='DT')
+        #hourly_data_means = pd.read_csv('hdatah.csv')
+
+
+        #hourly_data_means = data.resample('H').mean()
+        # data.to_csv('datah.csv')
+        # hourly_data_means.to_csv('hdatah.csv')
+
+        return data #, hourly_data_means
 
 
     def DG_before(self, data):
@@ -136,7 +153,7 @@ class DB_connector():
 
         #df.to_sql('temporary1', engine, if_exists='append')
 
-        sql_query = "UPDATE [TEST].[dbo].[" + self.table_to_write + "] SET [Mass_Pess1_set] = " +\
+        sql_query = "UPDATE [" + self.db_raw + "].[dbo].[" + self.table_to_write + "] SET [Mass_Pess1_set] = " +\
                     str(df.iloc[0]) + ",[Mass_Pess2_set] = " + str(df.iloc[1]) + ",[Mass_Qess_st1_set] = " +\
                     str(df.iloc[2]) + ",[Mass_Qess_st2_set] = " + str(df.iloc[3]) + ",[Mass_Qess1_set] = " +\
                     str(df.iloc[4]) + ",[Mass_Qess2_set] = " + str(df.iloc[5]) + ",[Mass_ESS1_mode_set] = " +\
@@ -172,7 +189,7 @@ class DB_connector():
 
         #sql_query = "WITH CTE AS (SELECT TOP 1 * FROM [TEST].[dbo].[temporary_0]) UPDATE CTE SET [index1] = "
 
-        sql_query = "UPDATE [TEST].[dbo].[INDEX_RT] SET [index] = " + str(increment)
+        sql_query = "UPDATE [" + self.db_raw + "].[dbo].[INDEX_RT] SET [index] = " + str(increment)
 
         #sql_query = "INSERT INTO [TEST].[dbo].[INDEX_RT] ([index]) VALUES (" + str(increment) +")"
 
