@@ -1,2 +1,3 @@
-DGU_forced_mode=0
-solver=0
+DGU_forced_mode=1
+solver=1
+SOC_forced_cycle=1

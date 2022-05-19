@@ -185,6 +185,12 @@ class DB_connector():
 
         return
 
+    def decision_to_csv(self, df):
+
+        df.to_csv('decision_found.csv')
+
+        return
+
     def indicator_to_sql(self, increment):
 
         #sql_query = "WITH CTE AS (SELECT TOP 1 * FROM [TEST].[dbo].[temporary_0]) UPDATE CTE SET [index1] = "

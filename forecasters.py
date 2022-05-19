@@ -266,16 +266,20 @@ class PV_forecaster:
         #plt.plot(DNI_erbs['dni'])
         #plt.plot(disc['dni'])
         #plt.plot(dirint)
-        #plt.plot(irrad_fcst['dni'])
-        #plt.plot(irrad_fcst['ghi'])
-        #plt.show()
+
+        ghii = irrad_fcst['ghi']
+        dnii = irrad_fcst['dni']
+
+        plt.plot(irrad_fcst['dni'])
+        plt.plot(irrad_fcst['ghi'])
+        plt.show()
         #print(dirint)
         #print(irrad_fcst['pressure'])
 
         poa_irrad_fcst = pvlib.irradiance.get_total_irradiance(
             surface_tilt=self.surface_tilt,
             surface_azimuth=self.surface_azimuth,
-            dni=irrad_fcst['dirint_dni'],
+            dni=irrad_fcst['dni'], #irrad_fcst['dirint_dni'],
             ghi=irrad_fcst['ghi'],
             dhi=irrad_fcst['dfhi'],
             solar_zenith=irrad_fcst['zenith'],
@@ -293,7 +297,9 @@ class PV_forecaster:
 
 
     def get_pv_forecast(self):
+
         poa_irrad_fcst = self.get_hourly_irrad_forecast()[1]
+
 
         module = self.pv_modules_CEC.T.iloc[9502]  # -4 относительно таблицы csv
         # добавление параметров модуля JAM72S10-410/MR
@@ -368,6 +374,10 @@ class PV_forecaster:
                                          losses_model='pvwatts')
         mc.run_model_from_poa(weather)
 
+        rocco  = mc.results.ac
+
+        plt.plot(mc.results.ac * 7)
+        plt.show()
 
 
         return mc.results.ac * 7 #*0.04

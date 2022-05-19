@@ -10,7 +10,9 @@ import sys
 import traceback
 import multiprocessing
 from pyomo.common.tempfiles import TempfileManager
-import time
+from datetime import datetime as dt
+from pyomo.util import model_size
+
 
 
 # игнорирование предупреждений. Потом нужно разобраться с каждым
@@ -74,6 +76,8 @@ class DecisionSeeking:
 
         result_df = pd.DataFrame()
 
+        print(model_size.build_model_size_report(model))
+
         result_df['Общая нагрузка, кВт'] = self.total_load
         result_df['Акт. мощность ДГУ 1, кВт'] = model.x1.get_values().values()
         result_df['Акт. мощность ДГУ 2, кВт'] = model.x2.get_values().values()
@@ -83,6 +87,15 @@ class DecisionSeeking:
         result_df['Статус ДГУ 2'] = model.u2.get_values().values()
         result_df['Статус ДГУ 3'] = model.u3.get_values().values()
         result_df['Статус ДГУ 4'] = model.u4.get_values().values()
+
+        result_df['Расход топлива ДГУ 1'] = 400 * 0.0219 * result_df['Статус ДГУ 1'] + 0.3031 * result_df['Акт. мощность ДГУ 1, кВт']
+        result_df['Расход топлива ДГУ 2'] = 400 * 0.0219 * result_df['Статус ДГУ 2'] + 0.3031 * result_df[
+            'Акт. мощность ДГУ 2, кВт']
+        result_df['Расход топлива ДГУ 3'] = 536 * 0.0491 * result_df['Статус ДГУ 3'] + 0.2788 * result_df[
+            'Акт. мощность ДГУ 3, кВт']
+        result_df['Расход топлива ДГУ 4'] = 536 * 0.0491 * result_df['Статус ДГУ 4'] + 0.2788 * result_df[
+            'Акт. мощность ДГУ 4, кВт']
+
         result_df['Акт. мощность заряда инвертора СНЭ 1, кВт'] = model.bat1_ch.get_values().values()
         result_df['Акт. мощность разряда инвертора СНЭ 1, кВт'] = model.bat1_dch.get_values().values()
         result_df['Акт. мощность заряда инвертора СНЭ 2, кВт'] = model.bat2_ch.get_values().values()
@@ -125,7 +138,6 @@ class DecisionSeeking:
         inverters_array['pv5_lim_cr'] = [0]*24
         inverters_array['pv6_lim_cr'] = [0]*24
         inverters_array['pv7_lim_cr'] = [0]*24
-
 
         Ppv_lim_sw = []
         Ppv_lim_sw0 = [[]]
@@ -272,20 +284,29 @@ class DecisionSeeking:
 
         return result_df, decision_list
 
-    def plot_summary(self, df):
+    def plot_summary(self, df, pv_fcst):
 
         df.index = self.datetime.strftime("%H:%M %d-%m")
 
         fig, ax = plt.subplots(1, figsize=(25, 15))
 
-
-
-        PV_power = df[['Акт. мощность инвертора СЭС 1, кВт', 'Акт. мощность инвертора СЭС 2, кВт',
+        PV_power_df = df[['Акт. мощность инвертора СЭС 1, кВт', 'Акт. мощность инвертора СЭС 2, кВт',
                        'Акт. мощность инвертора СЭС 3, кВт', 'Акт. мощность инвертора СЭС 4, кВт',
                        'Акт. мощность инвертора СЭС 5, кВт', 'Акт. мощность инвертора СЭС 6, кВт',
-                       'Акт. мощность инвертора СЭС 7, кВт']].sum(axis=1)
+                       'Акт. мощность инвертора СЭС 7, кВт']] #.sum(axis=1)
+
+        PV_power = PV_power_df.sum(axis=1)
+
+        PV_statuses = df[['Статус инвертора СЭС 1', 'Статус инвертора СЭС 2', 'Статус инвертора СЭС 3', 'Статус инвертора СЭС 4',
+             'Статус инвертора СЭС 5', 'Статус инвертора СЭС 6', 'Статус инвертора СЭС 7']]
+
+        fuel_consumption = (df[['Расход топлива ДГУ 1', 'Расход топлива ДГУ 2',
+            'Расход топлива ДГУ 3', 'Расход топлива ДГУ 4']].sum()).sum()
+
         ax.bar(df.index, PV_power, label='СЭС', edgecolor="black", width=0.75, hatch='//', color='orange')
-        ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o', color='slateblue')
+
+        ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o',
+               color='slateblue')
         ax.bar(df.index, -df['Акт. мощность заряда инвертора СНЭ 2, кВт'],
                bottom = -df['Акт. мощность заряда инвертора СНЭ 1, кВт'], width=0.75, edgecolor='black', hatch='o',
                color='darkslateblue')
@@ -294,7 +315,8 @@ class DecisionSeeking:
                                                                                df['Акт. мощность ДГУ 4, кВт'] +
                                                                                df['Акт. мощность ДГУ 1, кВт'] +
                                                                                      df['Акт. мощность ДГУ 2, кВт'] +
-                                                                                     PV_power, label='Инвертор СНЭ 1', width=0.75,
+                                                                                     PV_power, label='Инвертор СНЭ 1',
+               width=0.75,
                edgecolor='black', hatch='o',
                color='slateblue')
         ax.bar(df.index, df['Акт. мощность разряда инвертора СНЭ 2, кВт'], bottom=df['Акт. мощность ДГУ 3, кВт'] +
@@ -302,7 +324,8 @@ class DecisionSeeking:
                                                                                    df['Акт. мощность ДГУ 1, кВт'] +
                                                                                    df['Акт. мощность ДГУ 2, кВт'] +
                                                                 df['Акт. мощность разряда инвертора СНЭ 1, кВт'] +
-                                                                                   PV_power, label='Инвертор СНЭ 2', width=0.75,
+                                                                                   PV_power, label='Инвертор СНЭ 2',
+               width=0.75,
                edgecolor='black', hatch='o',
                color='darkslateblue')
 
@@ -321,6 +344,9 @@ class DecisionSeeking:
         ax.bar(df.index, df['Акт. мощность ДГУ 4, кВт'], label='ДГУ 4', bottom=PV_power + df['Акт. мощность ДГУ 3, кВт'],
                edgecolor="black", align='center', width=0.75, hatch="//", color='deepskyblue')
 
+        ax.bar(df.index, pv_fcst, label='Доступная мощность СЭС', edgecolor="black", width=0.25, hatch='',
+               color='orange')
+
         ax.grid()
         ax.set_axisbelow(True)
 
@@ -338,8 +364,7 @@ class DecisionSeeking:
         ax.plot(df.index, df['Общая нагрузка, кВт'], color='red', label='Общая нагрузка', linewidth=4, marker='o', markeredgecolor='black',
                 markersize=10)
 
-
-        ax.legend(ncol=4, bbox_to_anchor=(0.9, 1.15), fancybox=True, fontsize=18)
+        ax.legend(ncol=5, bbox_to_anchor=(0.9, 1.15), fancybox=True, fontsize=18)
 
         ax.set_xlabel('Дата и время', fontsize=15)
 
@@ -363,6 +388,12 @@ class DecisionSeeking:
         ax2.patch.set_alpha(0)
         ax2.set_ylim([30, 100])
         ax2.grid(None)
+        ax.set_title('Расчет выполнен в ' + dt.now().strftime('%H:%M %d-%m-%Y') + '. Суточный расход топлива ' + str(round(fuel_consumption, 2)) + ' л', fontsize=15)
+
+        # print(df.columns['Общая нагрузка, кВт'].astype(float) - df.columns['Акт. мощность ДГУ 1, кВт'].astype(float) - df.columns['Акт. мощность ДГУ 2, кВт'].astype(float) - df.columns['Акт. мощность ДГУ 3, кВт'].astype(float) - df.columns['Акт. мощность ДГУ 4, кВт'].astype(float) - df.columns['Акт. мощность разряда инвертора СНЭ 1, кВт'].astype(float) - df.columns['Акт. мощность разряда инвертора СНЭ 2, кВт'].astype(float) + df.columns['Акт. мощность заряда инвертора СНЭ 1, кВт'].astype(float) + df.columns['Акт. мощность заряда инвертора СНЭ 2, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 1, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 2, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 3, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 4, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 5, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 6, кВт'].astype(float) - df.columns['Акт. мощность инвертора СЭС 7, кВт'].astype(float))
+
+        df.to_csv('dff.csv')
+
         #plt.show()
         plt.savefig('оптимальное_решение.png')
 
@@ -396,13 +427,24 @@ def the_process():
 
         # # #
 
-        #db_data = db_readeru.DB_connector().db_to_pd(240)[0] # импортируем данные из БД
+        db_data = db_readeru.DB_connector().db_to_pd(240)[0] # импортируем данные из БД
 
         # # #
 
-        db_data = db_readeru.DB_connector().db_from_csv()
+        # # # db_data = db_readeru.DB_connector().db_from_csv()
 
-        total_load = data_importer.get_forecasts()[0][:, 0] #
+        try:
+            print()
+            print("...Выполнение прогнозирования электрических нагрузок...")
+            total_load = data_importer.get_forecasts()[0][:, 0]
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            print()
+            print("****** ОШИБКА! Не удалось выполнить прогнозирование мощности СЭС! ******")
+            print()
+            print("////// Модуль завершил работу. //////")
+            print()
+            sys.exit(1)
 
         try:
             print()
@@ -416,7 +458,6 @@ def the_process():
             print("////// Модуль завершил работу. //////")
             print()
             sys.exit(1)
-
 
         dgu_states = data_importer.eq_status()[1]
         equipment_availa = data_importer.eq_status()[0]
@@ -434,7 +475,7 @@ def the_process():
         sys.exit(1)
 
     try:
-        entity = formulation.Problemah(total_load, pv_fcst, dgu_states, equipment_availa, db_data, parameters[0])
+        entity = formulation.Problemah(total_load, pv_fcst, dgu_states, equipment_availa, db_data, parameters)
     except Exception as e:
         logging.error(traceback.format_exc())
         print()
@@ -464,12 +505,17 @@ def the_process():
         sys.exit(1)
 
     try:
-        #sql_stuff = db_readeru.DB_connector()
+        sql_stuff = db_readeru.DB_connector()
         print()
         print("...Запись найденного оптимального решения в БД MS SQL Server...")
-        db_readeru.DB_connector().decision_to_sql(resultado[1].loc[0])
+        # print("...Запись найденного оптимального решения в csv-файл...")
+        db_readeru.DB_connector().decision_to_sql(resultado[1].loc[0]) # запись в sql
+        db_readeru.DB_connector().decision_to_csv(resultado[1])
+
         print()
         print("...Оптимальное решение успешно записано в БД MS SQL Server...")
+        # print("...Оптимальное решение успешно записано в csv-файл...")
+
     except Exception as e:
         logging.error(traceback.format_exc())
         print()
@@ -482,7 +528,7 @@ def the_process():
     try:
         print()
         print("...Запись найденного оптимального решения в графический файл...")
-        ent.plot_summary(resultado[0])
+        ent.plot_summary(resultado[0], pv_fcst)
         print()
         print("...Решение успешно сохранено в файл оптимальное_решение.png...")
     except Exception as e:
@@ -496,6 +542,8 @@ def the_process():
 
 
 the_process()
+
+
 
 # def progress():
 #     start_time = time.time()

@@ -68,8 +68,8 @@ class Data_Importer():
         self_consumption_fcst = forecasters.Load_forecaster(self.load_files).self_consumption_forecast()
         total_load_fcst = load_fcst.values + self_consumption_fcst['Собственные нужды'].values
         pv_fcst = forecasters.PV_forecaster(self.pv_files2).get_pv_forecast()
-        pv_fcst = (pv_fcst/1000).values.reshape(24,1)
-        pv_fcst[pv_fcst<0] = 0
+        pv_fcst = (pv_fcst/1000).values.reshape(24, 1)
+        pv_fcst[pv_fcst < 0] = 0
 
         return total_load_fcst, pv_fcst, self_consumption_fcst, load_fcst
 
@@ -106,7 +106,7 @@ class Problemah:
         self.dgu_states = dgu_states
         self.equipment_availa = equipment_availa
         self.db_data = db_data
-        self.parameters = parameters #параметры режима ДГУ - принудительный и обычный
+        self.parameters = parameters #параметры режима ДГУ и СНЭ - принудительный и обычный
 
 
         # ДГУ
@@ -159,6 +159,9 @@ class Problemah:
         self.ESS_inv_P_nom = 150  # номинальная единичная активная мощность инверторов СНЭ, кВт
         self.battery1_dod = 40  # глубина разряда массива АКБ 1, %
         self.battery2_dod = 40  # глубина разряда массива АКБ 2, %
+        # настраиваемый уровень заряда СНЭ на конец расчетного периода (если нужно зарядить/разрядить АКБ принудительно)
+        self.soc1_after = self.db_data['F68'][0]/10 # 80
+        self.soc2_after = self.db_data['F69'][0]/10 # 80
 
         # объект Concrete-модели Pyomo
         self.m = pyo.ConcreteModel()
@@ -265,7 +268,7 @@ class Problemah:
         self.m.DGU4_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_down_time)
 
         #принудительная работа ДГУ
-        if self.parameters == 'DGU_forced_mode=1':
+        if self.parameters[0] == 'DGU_forced_mode=1':
             self.m.DGU_forced_on = pyo.Constraint(self.m.T, rule=self.DGU_forced)
 
         # # ограничения затрат на запуск ДГУ
@@ -300,6 +303,11 @@ class Problemah:
         # # ограничение синхронной работы СНЭ
         self.m.ess_as_one1 = pyo.Constraint(self.m.T, rule=self.cnstr_ess_as_one1)
         self.m.ess_as_one2 = pyo.Constraint(self.m.T, rule=self.cnstr_ess_as_one2)
+
+        # # ограничение на равенство уровней заряда СНЭ в начале и в конце расчетного периода
+        if self.parameters[2] == 'SOC_forced_cycle=1':
+            self.m.ess_cycled1 = pyo.Constraint(self.m.T, rule=self.cnstr_ess_cycle1)
+            self.m.ess_cycled2 = pyo.Constraint(self.m.T, rule=self.cnstr_ess_cycle2)
 
         # # пределы допустимых мощностей инверторов СЭС
         self.m.pv1 = pyo.Constraint(self.m.T, rule=lambda m, t: m.PV1[t] <= self.PV_inv_P_fcst[t]/7) #PV_inv_P_nom
@@ -572,6 +580,13 @@ class Problemah:
 
     def cnstr_ess_as_one2(self, m, i):
         return self.m.bat1_ch[i] == self.m.bat2_ch[i]
+
+    # условие одинакового уровня заряда СНЭ в начале и в конце расчетного периода
+    def cnstr_ess_cycle1(self, m, i):
+        return self.m.soc1[self.T2 - 1] >= self.soc1_after
+
+    def cnstr_ess_cycle2(self, m, i):
+        return self.m.soc2[self.T2 - 1] >= self.soc2_after
 
 
 
