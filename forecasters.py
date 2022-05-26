@@ -1,5 +1,5 @@
 import math
-
+import time as timeh
 import pandas as pd
 import numpy as np
 import pvlib
@@ -42,7 +42,7 @@ class Load_forecaster:
         self.Y_scaler.min_ = pickle.load(open(files_destination[2], 'rb'))[0]
         self.Y_scaler.scale_ = pickle.load(open(files_destination[2], 'rb'))[1]
 
-        self.current_datetime = datetime.now().astimezone(pytz.timezone("Asia/Vladivostok")) #+ timedelta(hours=20)
+        self.current_datetime = datetime.now().astimezone(pytz.timezone("Asia/Vladivostok")) #+ timedelta(days=30)
         self.dtrange = pd.date_range(self.current_datetime, freq='H', periods=24).round('H')
 
         self.location = pvlib.location.Location(67.55, 133.39, tz='Asia/Vladivostok',
@@ -180,6 +180,12 @@ class PV_forecaster:
 
         # запрос хэдеров со статистикой последних обновлений прогнозов
         try:
+
+            print()
+            print("...Загрузка данных метеопрогноза...", end=" ")
+
+
+
             if get('https://api.met.no/weatherapi/locationforecast/2.0/status',
                    headers=headers).status_code == 200:
                 # сервер работает и UserAgent не заблокирован
@@ -207,6 +213,9 @@ class PV_forecaster:
                                                                                        self.location.longitude)[
                     ['apparent_zenith',
                      'azimuth']]
+
+
+
             else:
                 return ('****** ОШИБКА! Сервер метеопрогнозов не отвечает, либо доступ к API запрещен! ******')
         except Exception as e:
@@ -215,6 +224,12 @@ class PV_forecaster:
 
 
     def get_hourly_irrad_forecast(self):
+
+        start_timeh = timeh.time()
+        print()
+        print("...Прогнозирование интенсивности солнечной радиации...")
+
+
         Weather = self.yrnoparser()  # получаем прогноз погоды
         SPA = pvlib.solarposition.spa_python(Weather.index, self.location.latitude, self.location.longitude)
         Weather['solar_azimuth'] = SPA['azimuth']
@@ -270,11 +285,12 @@ class PV_forecaster:
         ghii = irrad_fcst['ghi']
         dnii = irrad_fcst['dni']
 
-        plt.plot(irrad_fcst['dni'])
-        plt.plot(irrad_fcst['ghi'])
-        plt.show()
+        #plt.plot(irrad_fcst['dni'])
+        #plt.plot(irrad_fcst['ghi'])
+        #plt.show()
         #print(dirint)
         #print(irrad_fcst['pressure'])
+
 
         poa_irrad_fcst = pvlib.irradiance.get_total_irradiance(
             surface_tilt=self.surface_tilt,
@@ -293,7 +309,9 @@ class PV_forecaster:
         poa_irrad_fcst['wind_speed'] = Weather['wind_speed']
         poa_irrad_fcst['cloud'] = Weather['cloud_area_fraction']
 
-        return irrad_fcst.fillna(0), poa_irrad_fcst.fillna(0)
+        print("--- %s сек. ---" % round((timeh.time() - start_timeh), 3))
+
+        return irrad_fcst.fillna(0)/5, poa_irrad_fcst.fillna(0)/5
 
 
     def get_pv_forecast(self):
@@ -376,8 +394,8 @@ class PV_forecaster:
 
         rocco  = mc.results.ac
 
-        plt.plot(mc.results.ac * 7)
-        plt.show()
+        #plt.plot(mc.results.ac * 7)
+        #plt.show()
 
 
         return mc.results.ac * 7 #*0.04

@@ -18,7 +18,8 @@ class DB_connector():
         self.user = 'UID=' + self.params[4] + ';' #sa;'
         self.password = 'PWD=' + self.params[5] + ';' #KznZN43'
         #self.connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
-        self.connection = pyodbc.connect(self.driver + self.server + self.db + "Trusted_Connection=yes;")
+        self.connection = pyodbc.connect(self.driver + self.server + self.db + self.user + self.password + "Trusted_Connection=no;") #"Trusted_Connection=yes;"
+        #self.connection = pyodbc.connect(self.driver + self.server + self.db + "Trusted_Connection=yes;")
         self.table = self.params[6]
         self.table_to_write = self.params[7]
         #self.password = 'PWD=369147'
@@ -237,9 +238,9 @@ class DB_connector():
 
         for hour in range(0, 3):
             if data_from_sql['F1'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 0 \
-                    and data_from_sql['F9'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] != 30:
+                    and data_from_sql['F9'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] != 30: # ранее вместо 51 было 30
                 dgu1_statuses = dgu1_statuses + [0]
-            elif data_from_sql['F9'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 30:
+            elif data_from_sql['F9'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 30: # ранее вместо 51 было 30
                 dgu1_statuses = dgu1_statuses + [1]
 
             if data_from_sql['F2'].groupby(data_from_sql.index.hour, sort=False).mean().iloc[hour] == 0 \

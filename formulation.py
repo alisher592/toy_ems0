@@ -7,6 +7,8 @@ import db_readeru
 import traceback
 import logging
 import forecasters
+import re
+import time as timeh
 
 logging.basicConfig(filename='.\log\logging.log', level=logging.ERROR,
                                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -31,9 +33,12 @@ class Data_Importer():
             print()
             print("////// Модуль аварийно завершил работу. //////")
             print()
+            print("////// Окно закроется автоматически через 30 секунд. //////")
+            timeh.sleep(30)
             sys.exit(1)
 
         try:
+            start_timeh = timeh.time()
             print()
             print("...Загрузка вспомогательных файлов...")
             self.load_files = ['models/mlp_load_hourly.vrk', 'models/X_scaler_par.sca', 'models/Y_scaler_par.sca']
@@ -41,7 +46,13 @@ class Data_Importer():
                              'models/pv_keras/pv_Y_scaler_par.sca']
             self.pv_files2 = ['models/mlp_irrad_hourly_weather.vrk', 'models/irr_w_X_scaler_par.sca', 'models/irr_w_Y_scaler_par.sca']
             self.rowses = rows
+            print()
+            print("...Загрузка данных из БД SQL Server...")
             self.data_from_sql = self.db_connection.db_to_pd(rows=self.rowses)[0]
+            print()
+            print(self.data_from_sql)
+            print()
+            print("--- Данные из БД загружены за %s сек. ---" % round((timeh.time() - start_timeh), 3))
 
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -50,6 +61,8 @@ class Data_Importer():
             print()
             print("////// Модуль аварийно завершил работу. //////")
             print()
+            print("////// Окно закроется автоматически через 30 секунд. //////")
+            timeh.sleep(30)
             sys.exit(1)
 
     def eq_status(self):
@@ -111,14 +124,14 @@ class Problemah:
 
         # ДГУ
         self.DGU_quantity = 4  # количество ДГУ
-        self.DGU1_P_nom = 400  # номинальная мощность ДГУ1, кВт
-        self.DGU2_P_nom = 400  # номинальная мощность ДГУ2, кВт
-        self.DGU3_P_nom = 536  # номинальная мощность ДГУ3, кВт
-        self.DGU4_P_nom = 536  # номинальная мощность ДГУ4, кВт
-        self.DGU1_P_min = 0.5 * self.DGU1_P_nom  # минимальная мощность ДГУ1, кВт
-        self.DGU2_P_min = 0.5 * self.DGU2_P_nom  # минимальная мощность ДГУ2, кВт
-        self.DGU3_P_min = 0.5 * self.DGU3_P_nom  # минимальная мощность ДГУ3, кВт
-        self.DGU4_P_min = 0.5 * self.DGU4_P_nom  # минимальная мощность ДГУ4, кВт
+        self.DGU1_P_nom = float(re.findall(r"\d+", str(self.parameters[11]))[1])  # номинальная или доступная мощность ДГУ1, кВт
+        self.DGU2_P_nom = float(re.findall(r"\d+", str(self.parameters[12]))[1])  # номинальная или доступная мощность ДГУ2, кВт
+        self.DGU3_P_nom = float(re.findall(r"\d+", str(self.parameters[13]))[1])  # номинальная или доступная мощность ДГУ3, кВт
+        self.DGU4_P_nom = float(re.findall(r"\d+", str(self.parameters[14]))[1])  # номинальная или доступная мощность ДГУ4, кВт
+        self.DGU1_P_min = float(re.findall("\d+\.\d+", str(self.parameters[15]))[0]) * self.DGU1_P_nom  # минимальная мощность ДГУ1, кВт
+        self.DGU2_P_min = float(re.findall("\d+\.\d+", str(self.parameters[16]))[0]) * self.DGU2_P_nom  # минимальная мощность ДГУ2, кВт
+        self.DGU3_P_min = float(re.findall("\d+\.\d+", str(self.parameters[17]))[0]) * self.DGU3_P_nom  # минимальная мощность ДГУ3, кВт
+        self.DGU4_P_min = float(re.findall("\d+\.\d+", str(self.parameters[18]))[0]) * self.DGU4_P_nom  # минимальная мощность ДГУ4, кВт
         self.DGU1_F_a = 0.0219  # коэффициент расходной характеристики ДГУ1
         self.DGU2_F_a = 0.0219  # коэффициент расходной характеристики ДГУ2
         self.DGU3_F_a = 0.0491  # коэффициент расходной характеристики ДГУ3
@@ -157,8 +170,8 @@ class Problemah:
 
         # СНЭ
         self.ESS_inv_P_nom = 150  # номинальная единичная активная мощность инверторов СНЭ, кВт
-        self.battery1_dod = 40  # глубина разряда массива АКБ 1, %
-        self.battery2_dod = 40  # глубина разряда массива АКБ 2, %
+        self.battery1_dod = float(re.findall(r"\d+", str(self.parameters[19]))[1]) #40  # глубина разряда массива АКБ 1, %
+        self.battery2_dod = float(re.findall(r"\d+", str(self.parameters[20]))[1]) #40 глубина разряда массива АКБ 2, %
         # настраиваемый уровень заряда СНЭ на конец расчетного периода (если нужно зарядить/разрядить АКБ принудительно)
         self.soc1_after = self.db_data['F68'][0]/10 # 80
         self.soc2_after = self.db_data['F69'][0]/10 # 80
@@ -256,16 +269,49 @@ class Problemah:
         self.m.pv2_curtailment = pyo.Constraint(self.m.T, rule=self.cnstr_curtailment_control2)
 
         # # минимальное число последовательных часов работы ДГУ
-        self.m.DGU1_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_min_up_time)
-        self.m.DGU2_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_min_up_time)
-        self.m.DGU3_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_up_time)
-        self.m.DGU4_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_up_time)
+        # # # ДГУ 1
+        if self.parameters[3] == 'DGU1_min_up_time=3':
+            self.m.DGU1_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_min_up_time)
+        elif self.parameters[3] == 'DGU1_min_up_time=2':
+            self.m.DGU1_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_min_up_time_2)
+        # # # ДГУ 2
+        if self.parameters[5] == 'DGU2_min_up_time=3':
+            self.m.DGU2_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_min_up_time)
+        elif self.parameters[5] == 'DGU2_min_up_time=2':
+            self.m.DGU2_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_min_up_time_2)
+        # # # ДГУ 3
+        if self.parameters[7] == 'DGU3_min_up_time=3':
+            self.m.DGU3_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_up_time)
+        elif self.parameters[7] == 'DGU3_min_up_time=2':
+            self.m.DGU3_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_up_time_2)
+        # # # ДГУ 4
+        if self.parameters[9] == 'DGU4_min_up_time=3':
+            self.m.DGU4_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_up_time)
+        elif self.parameters[9] == 'DGU4_min_up_time=2':
+            self.m.DGU4_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_up_time_2)
 
-        # # минимальное число последовательных часов работы ДГУ
-        self.m.DGU1_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_min_down_time)
-        self.m.DGU2_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_min_down_time)
-        self.m.DGU3_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_down_time)
-        self.m.DGU4_min_down_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_down_time)
+        # # минимальное число последовательных часов простоя ДГУ
+        # # # ДГУ 1
+        if self.parameters[4] == 'DGU1_min_down_time=3':
+            self.m.DGU1_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_min_down_time)
+        elif self.parameters[4] == 'DGU1_min_down_time=2':
+            self.m.DGU1_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu1_min_down_time_2)
+        # # # ДГУ 2
+        if self.parameters[6] == 'DGU2_min_down_time=3':
+            self.m.DGU2_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_min_down_time)
+        elif self.parameters[6] == 'DGU2_min_down_time=2':
+            self.m.DGU1_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu2_min_down_time_2)
+        # # # ДГУ 3
+        if self.parameters[8] == 'DGU3_min_down_time=3':
+            self.m.DGU3_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_down_time)
+        elif self.parameters[8] == 'DGU3_min_down_time=2':
+            self.m.DGU3_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu3_min_down_time_2)
+        # # # ДГУ 4
+        if self.parameters[10] == 'DGU4_min_down_time=3':
+            self.m.DGU4_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_down_time)
+        elif self.parameters[10] == 'DGU4_min_down_time=2':
+            self.m.DGU4_min_up_time = pyo.Constraint(self.m.T, rule=self.cnstr_dgu4_min_down_time_2)
+
 
         #принудительная работа ДГУ
         if self.parameters[0] == 'DGU_forced_mode=1':
@@ -393,6 +439,7 @@ class Problemah:
         return self.m.PV1[i]+ self.m.PV2[i]+self.m.PV3[i]+self.m.PV4[i]+self.m.PV5[i]+self.m.PV6[i]+self.m.PV7[i] - \
                self.pv_fcst[i] - self.m.bat2_ch[i]/self.ESS_inv_P_nom <= 0
 
+    # 3-ЧАСОВАЯ РАБОТА
     @simple_constraint_rule
     def cnstr_dgu1_min_up_time(self, m, i):
         if i == self.T1:
@@ -459,6 +506,75 @@ class Problemah:
         else:
             return (m.u4[i - 1] + m.u4[i - 2] + m.u4[i - 3] - self.DGU4_min_up_time) * (m.u4[i - 1] - m.u4[i]) >= 0
 
+    # 2-ЧАСОВАЯ РАБОТА
+    @simple_constraint_rule
+    def cnstr_dgu1_min_up_time_2(self, m, i):
+        if i == self.T1:
+            return (self.dgu_states[0][2] + self.dgu_states[0][1] - 2) * (
+                           self.dgu_states[0][-1] - m.u1[i]) >= 0
+        if i == self.T1 + 1:
+            # if d1_past_up_statuses[0] == 0 and d1_past_up_statuses[1] == 0:
+            # return ((d1_past_up_statuses[2] + d1_past_up_statuses[1] + m.u1[i-1] - d1_min_up_time)*(m.u1[i-1] - m.u1[i])) >= 0
+            # else:
+            # return ((d1_past_up_statuses[2] + d1_past_up_statuses[1] + m.u1[i-1] - d1_min_up_time)*(m.u1[i-1] - m.u1[i]) - m.u1[i]) >= 0
+            return (self.dgu_states[0][2] + m.u1[i - 1] - 2) * (
+                    m.u1[i - 1] - m.u1[i]) >= 0
+        # if i == self.T1 + 2:
+        #     return (self.dgu_states[0][2] + m.u1[i - 2] + m.u1[i - 1] - self.DGU1_min_up_time) * (
+        #                 m.u1[i - 1] - m.u1[i]) >= 0
+        # elif T1 < i <= T1+2:
+        #    uj = []
+        #    #uj.append(m.u1[i-1])
+        #    for j in range(T1, i):
+        #        uj.append(m.u1[j])
+        #    return ((sum(uj) - d1_min_up_time)*(m.u1[i-1] - m.u1[i])) >= 0
+        else:
+            return (m.u1[i - 1] + m.u1[i - 2]  - 2) * (m.u1[i - 1] - m.u1[i]) >= 0
+
+    @simple_constraint_rule
+    def cnstr_dgu2_min_up_time_2(self, m, i):
+        if i == self.T1:
+            return (self.dgu_states[1][2] + self.dgu_states[1][1] - 2) * (
+                           self.dgu_states[1][-1] - m.u2[i]) >= 0
+        if i == self.T1 + 1:
+            return (self.dgu_states[1][2] + m.u2[i - 1] - 2) * (
+                    m.u2[i - 1] - m.u2[i]) >= 0
+        # if i == self.T1 + 2:
+        #     return (self.dgu_states[1][2] + m.u2[i - 2] + m.u2[i - 1] - self.DGU2_min_up_time) * (
+        #                 m.u2[i - 1] - m.u2[i]) >= 0
+        else:
+            return (m.u2[i - 1] + m.u2[i - 2] - 2) * (m.u2[i - 1] - m.u2[i]) >= 0
+
+    @simple_constraint_rule
+    def cnstr_dgu3_min_up_time_2(self, m, i):
+        if i == self.T1:
+            return (self.dgu_states[2][2] + self.dgu_states[2][1] - 2) * (
+                           self.dgu_states[2][-1] - m.u3[i]) >= 0
+        if i == self.T1 + 1:
+            return (self.dgu_states[2][2] + m.u3[i - 1] - 2) * (
+                    m.u3[i - 1] - m.u3[i]) >= 0
+        # if i == self.T1 + 2:
+        #     return (self.dgu_states[2][2] + m.u3[i - 2] + m.u3[i - 1] - self.DGU3_min_up_time) * (
+        #             m.u3[i - 1] - m.u3[i]) >= 0
+        else:
+            return (m.u3[i - 1] + m.u3[i - 2] - 2) * (m.u3[i - 1] - m.u3[i]) >= 0
+
+    @simple_constraint_rule
+    def cnstr_dgu4_min_up_time_2(self, m, i):
+        if i == self.T1:
+            return (self.dgu_states[3][2] + self.dgu_states[3][1] -
+                    2) * (
+                           self.dgu_states[3][-1] - m.u4[i]) >= 0
+        if i == self.T1 + 1:
+            return (self.dgu_states[3][2] + m.u4[i - 1] - 2) * (
+                    m.u2[i - 1] - m.u4[i]) >= 0
+        # if i == self.T1 + 2:
+        #     return (self.dgu_states[3][2] + m.u4[i - 2] + m.u4[i - 1] - self.DGU4_min_up_time) * (
+        #             m.u4[i - 1] - m.u4[i]) >= 0
+        else:
+            return (m.u4[i - 1] + m.u4[i - 2] - 2) * (m.u4[i - 1] - m.u4[i]) >= 0
+
+    # 3-ЧАСОВОЙ ПРОСТОЙ
     @simple_constraint_rule
     def cnstr_dgu1_min_down_time(self, m, i):
         if i == self.T1:
@@ -525,6 +641,83 @@ class Problemah:
             return (-(1 - m.u4[i - 1] + 1 - m.u4[i - 2] + 1 - m.u4[i - 3]) + self.DGU4_min_down_time) * (
                         -m.u4[i - 1] + m.u4[i]) <= 0
 
+    # 2-ЧАСОВОЙ ПРОСТОЙ
+    @simple_constraint_rule
+    def cnstr_dgu1_min_down_time_2(self, m, i):
+        if i == self.T1:
+            return (-(self.dgu_states[0][2] + self.dgu_states[0][1])
+                    + 2) * (-self.dgu_states[0][2] + m.u1[i]) <= 0
+        if i == self.T1 + 1:
+            return (-(self.dgu_states[0][2] +(
+                        1 - m.u1[i - 1])) + 2) * (
+                           -m.u1[i - 1] + m.u1[i]) <= 0
+        # if i == self.T1 + 2:
+        #     return (-(1 - self.dgu_states[0][2] + (1 - m.u1[i - 2]) + (
+        #                 1 - m.u1[i - 1])) + self.DGU1_min_down_time) * (
+        #                    -m.u1[i - 1] + m.u1[i]) <= 0
+        # elif i <= T1+2:
+        #    uj = []
+        #    uj.append(m.u1[i-1])
+        #    for j in range(T1, i):
+        #        uj.append(m.u1[j])
+        #    return ((sum(uj) - 2 + d1_min_down_time)*(-m.u1[i-1] + m.u1[i])) <= 0
+        else:
+            return (-(1 - m.u1[i - 1] + 1 - m.u1[i - 2]) + 2) * (
+                    -m.u1[i - 1] + m.u1[i]) <= 0
+
+    @simple_constraint_rule
+    def cnstr_dgu2_min_down_time_2(self, m, i):
+        if i == self.T1:
+            return (-(self.dgu_states[1][2] + self.dgu_states[1][1]) +
+                    2) * (-self.dgu_states[1][2] + m.u2[i]) <= 0
+        if i == self.T1 + 1:
+            return (-(1 - self.dgu_states[1][2] + 1 - self.dgu_states[1][1] + (
+                        1 - m.u2[i - 1])) + self.DGU2_min_down_time) * (
+                           -m.u2[i - 1] + m.u2[i]) <= 0
+        # if i == self.T1 + 2:
+        #     return (-(1 - self.dgu_states[1][2] + (1 - m.u2[i - 2]) + (
+        #                 1 - m.u2[i - 1])) + self.DGU2_min_down_time) * (
+        #                    -m.u2[i - 1] + m.u2[i]) <= 0
+        else:
+            return (-(1 - m.u2[i - 1] + 1 - m.u2[i - 2]) + 2) * (
+                    -m.u2[i - 1] + m.u2[i]) <= 0
+
+    @simple_constraint_rule
+    def cnstr_dgu3_min_down_time_2(self, m, i):
+        if i == self.T1:
+            return (-(self.dgu_states[2][2] + self.dgu_states[2][1]) +
+                    2) * (-self.dgu_states[2][2] + m.u3[i]) <= 0
+        if i == self.T1 + 1:
+            return (-(self.dgu_states[2][2] + (
+                        1 - m.u3[i - 1])) + 2) * (
+                           -m.u3[i - 1] + m.u3[i]) <= 0
+        # if i == self.T1 + 2:
+        #     return (-(1 - self.dgu_states[2][2] + (1 - m.u3[i - 2]) + (
+        #                 1 - m.u3[i - 1])) + self.DGU3_min_down_time) * (
+        #                    -m.u3[i - 1] + m.u3[i]) <= 0
+        else:
+            return (-(1 - m.u3[i - 1] + 1 - m.u3[i - 2]) + 2) * (
+                    -m.u3[i - 1] + m.u3[i]) <= 0
+
+    @simple_constraint_rule
+    def cnstr_dgu4_min_down_time_2(self, m, i):
+        if i == self.T1:
+            return (-(self.dgu_states[3][2] - self.dgu_states[3][1]) +
+                    2) * (-self.dgu_states[3][2] + m.u4[i]) <= 0
+        if i == self.T1 + 1:
+            return (-(self.dgu_states[3][2] + (
+                        1 - m.u4[i - 1])) + 2) * (
+                           -m.u4[i - 1] + m.u4[i]) <= 0
+        # if i == self.T1 + 2:
+        #     return (-(1 - self.dgu_states[3][2] + (1 - m.u4[i - 2]) + (
+        #                 1 - m.u4[i - 1])) + self.DGU4_min_down_time) * (
+        #                    -m.u4[i - 1] + m.u4[i]) <= 0
+        else:
+            return (-(1 - m.u4[i - 1] + 1 - m.u4[i - 2]) + 2) * (
+                    -m.u4[i - 1] + m.u4[i]) <= 0
+
+
+    # Сюда позже нужно добавить ограничения по расписанию
     def cnstr_dgu1_availability(self, m, i):
         return self.m.u1[i] == self.m.u1[i] * self.equipment_availa[0][0]
 

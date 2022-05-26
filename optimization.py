@@ -12,7 +12,7 @@ import multiprocessing
 from pyomo.common.tempfiles import TempfileManager
 from datetime import datetime as dt
 from pyomo.util import model_size
-
+import time
 
 
 # игнорирование предупреждений. Потом нужно разобраться с каждым
@@ -49,7 +49,7 @@ class DecisionSeeking:
             self.optimizer = pyo.SolverFactory('couenne', executable=os.getcwd() + '\\couenne67.exe') #'\\couenne67.exe')
 
         else:
-            self.optimizer = pyo.SolverFactory('scipampl', executable=os.getcwd() + '\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
+            self.optimizer = pyo.SolverFactory('scipampl', executable=os.getcwd() + '\\scipampl-7.0.0.win.x86_64.intel.opt.spx2')
 
     # def get_latest_data(self):
     #
@@ -368,8 +368,8 @@ class DecisionSeeking:
 
         ax.set_xlabel('Дата и время', fontsize=15)
 
-        major_ticks = np.arange(-200, 801, 50)
-        minor_ticks = np.arange(-200, 801, 25)
+        major_ticks = np.arange(-300, 801, 50)
+        minor_ticks = np.arange(-300, 801, 25)
 
         major_ticks2 = np.arange(0, 101, 10)
         minor_ticks2 = np.arange(0, 101, 5)
@@ -423,7 +423,7 @@ def the_process():
             f.close()
 
         data_importer = formulation.Data_Importer()
-        datetime = data_importer.get_forecasts()[3].index
+
 
         # # #
 
@@ -435,29 +435,29 @@ def the_process():
 
         try:
             print()
-            print("...Выполнение прогнозирования электрических нагрузок...")
-            total_load = data_importer.get_forecasts()[0][:, 0]
+            print("...Выполнение прогнозирования электрических нагрузок и выработки СЭС...")
+
+            forecast_data = data_importer.get_forecasts()
+
+            #datetime = data_importer.get_forecasts()[3].index
+
+            datetime = forecast_data[3].index
+
+            #total_load = data_importer.get_forecasts()[0][:, 0]
+            total_load = forecast_data[0][:, 0]
+            pv_fcst = forecast_data[1][:, 0]
+
         except Exception as e:
             logging.error(traceback.format_exc())
             print()
-            print("****** ОШИБКА! Не удалось выполнить прогнозирование мощности СЭС! ******")
+            print("****** ОШИБКА! Не удалось выполнить прогнозирование! ******")
             print()
             print("////// Модуль завершил работу. //////")
             print()
+            print("////// Окно закроется автоматически через 30 секунд. //////")
+            time.sleep(30)
             sys.exit(1)
 
-        try:
-            print()
-            print("...Выполнение прогнозирования мощности СЭС...")
-            pv_fcst = data_importer.get_forecasts()[1][:, 0]
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            print()
-            print("****** ОШИБКА! Не удалось выполнить прогнозирование мощности СЭС! ******")
-            print()
-            print("////// Модуль завершил работу. //////")
-            print()
-            sys.exit(1)
 
         dgu_states = data_importer.eq_status()[1]
         equipment_availa = data_importer.eq_status()[0]
@@ -472,6 +472,8 @@ def the_process():
         print()
         print("////// Модуль завершил работу. //////")
         print()
+        print("////// Окно закроется автоматически через 30 секунд. //////")
+        time.sleep(30)
         sys.exit(1)
 
     try:
@@ -483,6 +485,8 @@ def the_process():
         print()
         print("////// Модуль завершил работу. //////")
         print()
+        print("////// Окно закроется автоматически через 30 секунд. //////")
+        time.sleep(30)
         sys.exit(1)
 
     try:
@@ -502,6 +506,8 @@ def the_process():
         print()
         print("////// Модуль завершил работу. //////")
         print()
+        print("////// Окно закроется автоматически через 30 секунд. //////")
+        time.sleep(30)
         sys.exit(1)
 
     try:
@@ -523,6 +529,8 @@ def the_process():
         print()
         print("////// Модуль завершил работу. //////")
         print()
+        print("////// Окно закроется автоматически через 30 секунд. //////")
+        time.sleep(30)
         sys.exit(1)
 
     try:
@@ -538,11 +546,15 @@ def the_process():
         print()
         print("////// Модуль успешно завершил работу. //////")
         print()
+        print("////// Окно закроется автоматически через 30 секунд. //////")
+        time.sleep(30)
         sys.exit(1)
 
 
 the_process()
-
+print("////// Окно закроется автоматически через 30 секунд. //////")
+time.sleep(30)
+sys.exit(1)
 
 
 # def progress():
