@@ -21,9 +21,16 @@ warnings.filterwarnings("ignore")
 
 import logging
 
+# очищение папки tempo каждый раз при запуске
+path = os.getcwd()+"\\tempo"
+for root, dirs, files in os.walk(path):
+    for file in files:
+        os.remove(os.path.join(root, file))
 
 if not os.path.exists(os.getcwd()+"\\tempo"):
     os.makedirs(os.getcwd()+"\\tempo")
+
+
 
 if not os.path.exists(os.getcwd()+"\\log"):
     os.makedirs(os.getcwd()+"\\log")
@@ -121,7 +128,7 @@ class DecisionSeeking:
         inverters_array = result_df[['Акт. мощность инвертора СЭС 1, кВт','Акт. мощность инвертора СЭС 2, кВт',
                                      'Акт. мощность инвертора СЭС 3, кВт','Акт. мощность инвертора СЭС 4, кВт',
                                      'Акт. мощность инвертора СЭС 5, кВт','Акт. мощность инвертора СЭС 6, кВт',
-                                     'Акт. мощность инвертора СЭС 7, кВт',]]
+                                     'Акт. мощность инвертора СЭС 7, кВт']]
 
         inverters_array['pv1_lim_sw'] = np.nan
         inverters_array['pv2_lim_sw'] = np.nan

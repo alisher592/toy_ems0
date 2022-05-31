@@ -274,6 +274,8 @@ class PV_forecaster:
         irrad_fcst['dirint_dni'] = dirint #DNI_erbs['dni']
         irrad_fcst['clearsky_dni'] = clearsky_dni
 
+        oblakah = Weather['cloud_area_fraction'].mean()
+
         disc = pvlib.irradiance.disc(irrad_fcst['ghi'], irrad_fcst['zenith'], irrad_fcst.index,
                                      pressure=1000*irrad_fcst['pressure'],
                                      min_cos_zenith=0.065, max_zenith=87, max_airmass=12)
@@ -311,7 +313,17 @@ class PV_forecaster:
 
         print("--- %s сек. ---" % round((timeh.time() - start_timeh), 3))
 
-        return irrad_fcst.fillna(0)/5, poa_irrad_fcst.fillna(0)/5
+        if oblakah <= 70:
+
+            return irrad_fcst.fillna(0), poa_irrad_fcst.fillna(0)
+
+        elif 70 < oblakah < 80  :
+
+            return irrad_fcst.fillna(0)/3, poa_irrad_fcst.fillna(0)/3
+
+        elif 80 <= oblakah <= 100  :
+
+            return irrad_fcst.fillna(0)/4, poa_irrad_fcst.fillna(0)/4
 
 
     def get_pv_forecast(self):

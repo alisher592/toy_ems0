@@ -20,6 +20,7 @@ class DB_connector():
         #self.connection = pyodbc.connect(self.driver + self.server + self.port + self.db + self.user + self.password)
         self.connection = pyodbc.connect(self.driver + self.server + self.db + self.user + self.password + "Trusted_Connection=no;") #"Trusted_Connection=yes;"
         #self.connection = pyodbc.connect(self.driver + self.server + self.db + "Trusted_Connection=yes;")
+
         self.table = self.params[6]
         self.table_to_write = self.params[7]
         #self.password = 'PWD=369147'

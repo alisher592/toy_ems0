@@ -750,13 +750,13 @@ class Problemah:
     #ограничение глубины разряда СНЭ
     def cnstr_soc1_ctrl(self, m, i):
         if i == self.T1:
-            return self.m.soc1[i] == self.db_data['F68'][0]/10 - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency 0.95 inverter efficiency
+            return self.m.soc1[i] == self.db_data['F68'][0] - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency 0.95 inverter efficiency
         else:
             return self.m.soc1[i] == self.m.soc1[i-1] - 100*self.m.bat1_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat1_ch[i]/700 #0.8 round trip efficiency
 
     def cnstr_soc2_ctrl(self, m, i):
         if i == self.T1:
-            return self.m.soc2[i] == self.db_data['F69'][0]/10 - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
+            return self.m.soc2[i] == self.db_data['F69'][0] - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
         else:
             return self.m.soc2[i] == self.m.soc2[i-1] - 100*self.m.bat2_dch[i]/(0.95*0.9*700) + 0.9*100*self.m.bat2_ch[i]/700
 
